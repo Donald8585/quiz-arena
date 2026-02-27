@@ -1,0 +1,13 @@
+name: CI
+on: { push: { branches: [main] }, pull_request: { branches: [main] } }
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f docker-compose.local.yml build
+      - run: docker compose -f docker-compose.local.yml up -d
+      - run: sleep 30
+      - run: curl -f http://localhost:80/health
+      - run: curl -f http://localhost:9000/health
+      - run: docker compose -f docker-compose.local.yml down -v
