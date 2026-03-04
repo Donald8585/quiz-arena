@@ -1,4 +1,4 @@
-aws_region    = "ap-east-1"
+aws_region    = "us-east-1"
 key_name      = "your-key-pair-name"
 my_ip         = "YOUR.IP.HERE/32"
 github_repo   = "Donald8585/quiz-arena"

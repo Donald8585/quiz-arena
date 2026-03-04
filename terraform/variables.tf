@@ -1,13 +1,13 @@
 variable "aws_region" {
   description = "AWS region"
   type        = string
-  default     = "ap-east-1"
+  default     = "us-east-1"
 }
 
 variable "ami_id" {
-  description = "Amazon Linux 2023 AMI (check your region!)"
+  description = "Amazon Linux 2023 AMI (region-specific - update if changing region)"
   type        = string
-  default     = "ami-0a27d5c93b5a3a4f0"
+  default     = "ami-0f3caa1cf4417e51b"
 }
 
 variable "key_name" {
