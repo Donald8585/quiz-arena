@@ -5,7 +5,7 @@ variable "aws_region" {
 }
 
 variable "ami_id" {
-  description = "Amazon Linux 2023 AMI (region-specific - update if changing region)"
+  description = "Amazon Linux 2023 AMI (region-specific)"
   type        = string
   default     = "ami-0f3caa1cf4417e51b"
 }
@@ -16,7 +16,7 @@ variable "key_name" {
 }
 
 variable "my_ip" {
-  description = "Your IP for SSH access (e.g. 1.2.3.4/32)"
+  description = "Your IP for restricted access (e.g. 1.2.3.4/32)"
   type        = string
 }
 

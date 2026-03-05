@@ -1,42 +1,87 @@
-import random, time
-from fastapi import FastAPI
-app = FastAPI(title="Quiz Lambda")
-QUESTIONS = {
-    "cloud": [
-        {"question_text": "What does IaaS stand for?", "option_a": "Internet as a Service", "option_b": "Infrastructure as a Service", "option_c": "Integration as a Service", "option_d": "Intelligence as a Service", "correct_answer": "B"},
-        {"question_text": "Which AWS service provides serverless compute?", "option_a": "EC2", "option_b": "EBS", "option_c": "Lambda", "option_d": "VPC", "correct_answer": "C"},
-        {"question_text": "Main benefit of containerization?", "option_a": "Faster CPU", "option_b": "More RAM", "option_c": "Consistent environments", "option_d": "Free hosting", "correct_answer": "C"},
-        {"question_text": "What does CDN stand for?", "option_a": "Central Data Network", "option_b": "Content Delivery Network", "option_c": "Cloud Database Node", "option_d": "Compute Distribution Network", "correct_answer": "B"},
-        {"question_text": "Which is a NoSQL database?", "option_a": "PostgreSQL", "option_b": "MySQL", "option_c": "MongoDB", "option_d": "Oracle", "correct_answer": "C"},
-        {"question_text": "What is Kubernetes used for?", "option_a": "Database management", "option_b": "Container orchestration", "option_c": "Code compilation", "option_d": "Network routing", "correct_answer": "B"},
+import json
+import random
+from datetime import datetime
+
+QUESTION_BANK = {
+    "general": [
+        {"q": "What is the capital of France?", "options": ["London", "Berlin", "Paris", "Madrid"], "answer": 2},
+        {"q": "Which planet is known as the Red Planet?", "options": ["Venus", "Mars", "Jupiter", "Saturn"], "answer": 1},
+        {"q": "What is the largest ocean on Earth?", "options": ["Atlantic", "Indian", "Arctic", "Pacific"], "answer": 3},
+        {"q": "Who painted the Mona Lisa?", "options": ["Van Gogh", "Da Vinci", "Picasso", "Monet"], "answer": 1},
+        {"q": "What is the chemical symbol for gold?", "options": ["Go", "Gd", "Au", "Ag"], "answer": 2},
+        {"q": "Which country has the most population?", "options": ["USA", "India", "China", "Indonesia"], "answer": 1},
+        {"q": "What year did World War II end?", "options": ["1943", "1944", "1945", "1946"], "answer": 2},
+        {"q": "What is the speed of light?", "options": ["300k km/s", "150k km/s", "450k km/s", "600k km/s"], "answer": 0},
+        {"q": "Which element has atomic number 1?", "options": ["Helium", "Hydrogen", "Lithium", "Carbon"], "answer": 1},
+        {"q": "What is the tallest mountain in the world?", "options": ["K2", "Kangchenjunga", "Everest", "Lhotse"], "answer": 2},
     ],
-    "devops": [
-        {"question_text": "What does CI/CD stand for?", "option_a": "Code Integration", "option_b": "Continuous Integration/Delivery", "option_c": "Central Infrastructure", "option_d": "Cloud Integration", "correct_answer": "B"},
-        {"question_text": "Docker Compose is for?", "option_a": "Music", "option_b": "Multi-container apps", "option_c": "Single container", "option_d": "Code review", "correct_answer": "B"},
-        {"question_text": "Nginx commonly serves as?", "option_a": "Database", "option_b": "Reverse proxy", "option_c": "Code editor", "option_d": "Email server", "correct_answer": "B"},
-        {"question_text": "Prometheus is for?", "option_a": "Logs", "option_b": "Metrics monitoring", "option_c": "File hosting", "option_d": "Email", "correct_answer": "B"},
-        {"question_text": "Redis is primarily?", "option_a": "Relational DB", "option_b": "In-memory cache", "option_c": "File system", "option_d": "OS", "correct_answer": "B"},
+    "tech": [
+        {"q": "What does CPU stand for?", "options": ["Central Process Unit", "Central Processing Unit", "Computer Personal Unit", "Central Program Utility"], "answer": 1},
+        {"q": "Who created Python?", "options": ["Guido van Rossum", "James Gosling", "Bjarne Stroustrup", "Dennis Ritchie"], "answer": 0},
+        {"q": "What does HTML stand for?", "options": ["Hyper Text Markup Language", "High Tech Modern Language", "Hyper Transfer Markup Language", "Home Tool Markup Language"], "answer": 0},
+        {"q": "Which company developed React?", "options": ["Google", "Apple", "Meta", "Amazon"], "answer": 2},
+        {"q": "What is Docker used for?", "options": ["Database management", "Containerization", "Version control", "Load balancing"], "answer": 1},
+        {"q": "What does API stand for?", "options": ["Application Program Interface", "Application Programming Interface", "Automated Programming Interface", "Application Process Integration"], "answer": 1},
+        {"q": "Which cloud provider is owned by Amazon?", "options": ["Azure", "GCP", "AWS", "Alibaba Cloud"], "answer": 2},
+        {"q": "What port does HTTP use by default?", "options": ["443", "8080", "22", "80"], "answer": 3},
+        {"q": "What does SQL stand for?", "options": ["Structured Query Language", "Simple Query Language", "Standard Query Logic", "Sequential Query Language"], "answer": 0},
+        {"q": "What is Kubernetes?", "options": ["A database", "A container orchestrator", "A programming language", "A web framework"], "answer": 1},
     ],
-    "security": [
-        {"question_text": "What does JWT stand for?", "option_a": "Java Web Token", "option_b": "JSON Web Token", "option_c": "JS Web Transfer", "option_d": "Just Wait Then", "correct_answer": "B"},
-        {"question_text": "bcrypt is for?", "option_a": "Encrypting files", "option_b": "Password hashing", "option_c": "Network routing", "option_d": "DB queries", "correct_answer": "B"},
-        {"question_text": "CORS stands for?", "option_a": "Central Origin", "option_b": "Cross-Origin Resource Sharing", "option_c": "Cloud Optimized", "option_d": "Cached Object", "correct_answer": "B"},
-        {"question_text": "Rate limiting prevents?", "option_a": "Speed", "option_b": "Abuse via request limits", "option_c": "Compression", "option_d": "Caching", "correct_answer": "B"},
-    ],
-    "distributed": [
-        {"question_text": "CAP theorem states?", "option_a": "All three guaranteed", "option_b": "Only two of C/A/P", "option_c": "Always consistent", "option_d": "No partitions", "correct_answer": "B"},
-        {"question_text": "Horizontal scaling means?", "option_a": "More CPU", "option_b": "More servers", "option_c": "More RAM", "option_d": "Faster disks", "correct_answer": "B"},
-        {"question_text": "Pub/Sub pattern is?", "option_a": "Public Subscription", "option_b": "Publish/Subscribe messaging", "option_c": "Push/Pull", "option_d": "Peer broadcast", "correct_answer": "B"},
+    "science": [
+        {"q": "What is the chemical formula for water?", "options": ["H2O", "CO2", "NaCl", "O2"], "answer": 0},
+        {"q": "What is the powerhouse of the cell?", "options": ["Nucleus", "Ribosome", "Mitochondria", "Golgi body"], "answer": 2},
+        {"q": "What gas do plants absorb?", "options": ["Oxygen", "Nitrogen", "Carbon Dioxide", "Hydrogen"], "answer": 2},
+        {"q": "What is Newton's first law about?", "options": ["Gravity", "Inertia", "Acceleration", "Reaction"], "answer": 1},
+        {"q": "How many chromosomes do humans have?", "options": ["23", "44", "46", "48"], "answer": 2},
+        {"q": "What is the pH of pure water?", "options": ["0", "7", "14", "1"], "answer": 1},
+        {"q": "Which vitamin does sunlight provide?", "options": ["A", "B", "C", "D"], "answer": 3},
+        {"q": "What is the hardest natural substance?", "options": ["Gold", "Iron", "Diamond", "Platinum"], "answer": 2},
     ],
 }
-@app.get("/health")
-async def health(): return {"status": "ok"}
-@app.get("/generate")
-async def generate(topic: str = "cloud", count: int = 5):
-    start = time.time()
-    avail = QUESTIONS.get(topic, QUESTIONS["cloud"])
-    sel = random.sample(avail, min(count, len(avail)))
-    qs = [{"id": i+1, **q, "time_limit": 15} for i, q in enumerate(sel)]
-    return {"topic": topic, "count": len(qs), "questions": qs, "execution_time_ms": round((time.time()-start)*1000, 2)}
-@app.get("/topics")
-async def topics(): return {"topics": list(QUESTIONS.keys())}
+
+
+def lambda_handler(event, context):
+    """Quiz Arena - Serverless Question Generator (AWS Lambda)"""
+    try:
+        body = json.loads(event.get("body", "{}")) if isinstance(event.get("body"), str) else event
+    except (json.JSONDecodeError, TypeError):
+        body = {}
+
+    category = body.get("category", "general")
+    difficulty = body.get("difficulty", "medium")
+    count = min(body.get("count", 5), 10)
+    action = body.get("action", "generate")
+
+    if action == "validate":
+        user_answers = body.get("answers", [])
+        correct_answers = body.get("correct", [])
+        score = sum(1 for u, c in zip(user_answers, correct_answers) if u == c)
+        total = len(correct_answers)
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+            "body": json.dumps({
+                "score": score,
+                "total": total,
+                "percentage": round(score / total * 100, 1) if total > 0 else 0,
+                "validated_at": datetime.utcnow().isoformat(),
+                "source": "aws-lambda",
+            }),
+        }
+
+    questions = QUESTION_BANK.get(category, QUESTION_BANK["general"])
+    selected = random.sample(questions, min(count, len(questions)))
+    random.shuffle(selected)
+
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
+        "body": json.dumps({
+            "questions": selected,
+            "category": category,
+            "difficulty": difficulty,
+            "count": len(selected),
+            "generated_at": datetime.utcnow().isoformat(),
+            "source": "aws-lambda",
+        }),
+    }

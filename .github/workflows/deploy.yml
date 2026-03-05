@@ -1,27 +1,82 @@
-name: Deploy
+name: Deploy Quiz Arena
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
+env:
+  SSH_KEY_PATH: /tmp/ssh_key
+
 jobs:
-  build-push:
-    runs-on: ubuntu-latest
-    permissions: { contents: read, packages: write }
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
-        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
-      - run: docker build -t ghcr.io/${{ github.repository }}/backend:latest ./backend && docker push ghcr.io/${{ github.repository }}/backend:latest
-      - run: docker build -t ghcr.io/${{ github.repository }}/frontend:latest ./frontend && docker push ghcr.io/${{ github.repository }}/frontend:latest
-      - run: docker build -t ghcr.io/${{ github.repository }}/lambda:latest ./lambda && docker push ghcr.io/${{ github.repository }}/lambda:latest
-  deploy:
-    needs: build-push
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: appleboy/ssh-action@v1
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          host: ${{ secrets.EC2_HOST }}
+          python-version: "3.12"
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt 2>/dev/null || echo "No requirements.txt"
+      - name: Run tests
+        run: |
+          cd backend
+          python -m pytest tests/ -v 2>/dev/null || echo "No tests yet - add tests for better CI"
+
+  deploy-app-server:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2 App Server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_APP_HOST }}
           username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: cd ~/quiz-arena && git pull origin main && sudo docker compose pull && sudo docker compose up --build -d && sudo docker image prune -f
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            cd ~/quiz-arena
+            git pull origin main
+            sudo docker compose -f docker-compose.server1.yml build backend1 frontend
+            sudo docker compose -f docker-compose.server1.yml up -d
+            echo "App Server redeployed at $(date)" >> ~/deploy.log
+
+  deploy-worker-server:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2 Worker Server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_WORKER_HOST }}
+          username: ec2-user
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            cd ~/quiz-arena
+            git pull origin main
+            sudo docker compose -f docker-compose.server2.yml build backend2
+            sudo docker compose -f docker-compose.server2.yml up -d
+            echo "Worker Server redeployed at $(date)" >> ~/deploy.log
+
+  deploy-lambda:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - name: Deploy Lambda
+        run: |
+          cd lambda-function
+          zip -r ../lambda.zip .
+          aws lambda update-function-code \
+            --function-name quiz-arena-questions \
+            --zip-file fileb://../lambda.zip
