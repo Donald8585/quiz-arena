@@ -1,4 +1,4 @@
-import os, json, asyncio, logging, time
+import os, json, asyncio, logging, time, random
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
@@ -9,7 +9,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from jose import jwt
 import redis.asyncio as aioredis
 import httpx
-import boto3
 from app.models.database import engine, Base
 from app.routers import quiz, users
 from app.models.manager import ConnectionManager
@@ -36,8 +35,80 @@ manager = ConnectionManager()
 pubsub = None
 lambda_client = None
 
+FALLBACK_QUESTIONS = {
+    "cloud": [
+        {"q": "What does EC2 stand for in AWS?", "options": ["Elastic Compute Cloud", "Electronic Computing Center", "Enterprise Cloud Computing", "Elastic Container Cluster"], "answer": 0},
+        {"q": "Which AWS service is a managed NoSQL database?", "options": ["RDS", "DynamoDB", "Redshift", "Aurora"], "answer": 1},
+        {"q": "What is the maximum size of an S3 object?", "options": ["1 TB", "5 TB", "10 TB", "Unlimited"], "answer": 1},
+        {"q": "Which service provides serverless computing on AWS?", "options": ["EC2", "ECS", "Lambda", "Lightsail"], "answer": 2},
+        {"q": "What does VPC stand for?", "options": ["Virtual Public Cloud", "Virtual Private Cloud", "Virtual Protected Computing", "Virtual Private Container"], "answer": 1},
+        {"q": "Which AWS service is used for DNS management?", "options": ["CloudFront", "Route 53", "API Gateway", "Direct Connect"], "answer": 1},
+        {"q": "What type of storage is Amazon EBS?", "options": ["Object storage", "Block storage", "File storage", "Archive storage"], "answer": 1},
+        {"q": "Which service provides a CDN on AWS?", "options": ["S3", "CloudFront", "ElastiCache", "Global Accelerator"], "answer": 1},
+        {"q": "What is the default region for AWS services?", "options": ["eu-west-1", "ap-southeast-1", "us-east-1", "us-west-2"], "answer": 2},
+        {"q": "Which AWS service provides managed Kubernetes?", "options": ["ECS", "EKS", "Fargate", "Elastic Beanstalk"], "answer": 1},
+    ],
+    "devops": [
+        {"q": "What does CI/CD stand for?", "options": ["Continuous Integration/Continuous Deployment", "Code Integration/Code Delivery", "Continuous Inspection/Continuous Development", "Central Integration/Central Delivery"], "answer": 0},
+        {"q": "Which tool is commonly used for container orchestration?", "options": ["Jenkins", "Kubernetes", "Ansible", "Terraform"], "answer": 1},
+        {"q": "What is the purpose of a Dockerfile?", "options": ["Run tests", "Define container image build steps", "Deploy to production", "Monitor applications"], "answer": 1},
+        {"q": "Which command lists running Docker containers?", "options": ["docker images", "docker ps", "docker run", "docker list"], "answer": 1},
+        {"q": "What is Terraform primarily used for?", "options": ["CI/CD pipelines", "Infrastructure as Code", "Application monitoring", "Log management"], "answer": 1},
+        {"q": "What does git rebase do?", "options": ["Delete a branch", "Reapply commits on top of another base", "Merge two branches", "Reset to initial commit"], "answer": 1},
+        {"q": "Which file defines a Docker Compose setup?", "options": ["Dockerfile", "docker-compose.yml", "Makefile", "package.json"], "answer": 1},
+        {"q": "What is a rolling deployment?", "options": ["Deploy all at once", "Gradually replace old with new instances", "Deploy to staging only", "Rollback deployment"], "answer": 1},
+        {"q": "Which tool is used for secrets management?", "options": ["GitHub Actions", "HashiCorp Vault", "Docker Hub", "Nginx"], "answer": 1},
+        {"q": "What does a load balancer do?", "options": ["Store data", "Distribute traffic across servers", "Build containers", "Run CI pipelines"], "answer": 1},
+    ],
+    "security": [
+        {"q": "What does SSL/TLS provide?", "options": ["Load balancing", "Encryption in transit", "Data compression", "Caching"], "answer": 1},
+        {"q": "What is a SQL injection attack?", "options": ["Overloading a server", "Inserting malicious SQL into queries", "Stealing cookies", "DNS spoofing"], "answer": 1},
+        {"q": "What does MFA stand for?", "options": ["Multi-Factor Authentication", "Multiple Firewall Access", "Managed File Authorization", "Main Function Allocation"], "answer": 0},
+        {"q": "Which port does HTTPS use by default?", "options": ["80", "8080", "443", "22"], "answer": 2},
+        {"q": "What is a DDoS attack?", "options": ["Data theft", "Distributed Denial of Service", "DNS hijacking", "Disk corruption"], "answer": 1},
+        {"q": "What is the principle of least privilege?", "options": ["Give everyone admin access", "Give minimum permissions needed", "Restrict all access", "Use only root accounts"], "answer": 1},
+        {"q": "What does a WAF protect against?", "options": ["Hardware failure", "Web application attacks", "Power outages", "Network latency"], "answer": 1},
+        {"q": "What is XSS?", "options": ["Cross-Site Scripting", "XML Security Standard", "External Server Service", "Cross-System Sync"], "answer": 0},
+        {"q": "Which encryption type uses a shared key?", "options": ["Asymmetric", "Symmetric", "Hashing", "Salting"], "answer": 1},
+        {"q": "What is a zero-day vulnerability?", "options": ["A bug found on day zero", "An unknown exploit with no patch available", "A vulnerability that takes zero days to fix", "A test vulnerability"], "answer": 1},
+    ],
+    "distributed": [
+        {"q": "What does the CAP theorem state?", "options": ["You can have all three", "You can only guarantee 2 of 3: C, A, P", "Caching Always Performs better", "Clusters Are Parallel"], "answer": 1},
+        {"q": "What is eventual consistency?", "options": ["Data is always consistent", "All replicas converge to same value over time", "Data is never consistent", "Consistency checked every hour"], "answer": 1},
+        {"q": "What is a message broker?", "options": ["A load balancer", "Middleware for message routing between services", "A database", "A DNS server"], "answer": 1},
+        {"q": "Which is a distributed consensus algorithm?", "options": ["Bubble Sort", "Raft", "Dijkstra", "Binary Search"], "answer": 1},
+        {"q": "What is horizontal scaling?", "options": ["Adding more RAM", "Adding more machines", "Upgrading CPU", "Using faster disks"], "answer": 1},
+        {"q": "What is Redis primarily used for?", "options": ["Relational data storage", "In-memory caching and pub/sub", "File storage", "CI/CD pipelines"], "answer": 1},
+        {"q": "What is a circuit breaker pattern?", "options": ["A hardware fuse", "Prevents cascading failures in distributed systems", "A network switch", "A load balancing algorithm"], "answer": 1},
+        {"q": "What does gRPC use for serialization?", "options": ["JSON", "XML", "Protocol Buffers", "YAML"], "answer": 2},
+        {"q": "What is sharding?", "options": ["Splitting data across multiple databases", "Encrypting data", "Caching data", "Compressing data"], "answer": 0},
+        {"q": "What is idempotency?", "options": ["Running once gives same result as running multiple times", "Running faster each time", "Running in parallel", "Running backwards"], "answer": 0},
+    ],
+}
+
 def create_token(username):
     return jwt.encode({"sub": username, "exp": datetime.utcnow() + timedelta(hours=24)}, JWT_SECRET, algorithm="HS256")
+
+def transform_questions(raw_questions):
+    letters = ["A", "B", "C", "D"]
+    mapped = []
+    for q in raw_questions:
+        opts = q.get("options", [])
+        answer_idx = q.get("answer", 0)
+        mapped.append({
+            "question_text": q.get("q", ""),
+            "option_a": opts[0] if len(opts) > 0 else "",
+            "option_b": opts[1] if len(opts) > 1 else "",
+            "option_c": opts[2] if len(opts) > 2 else "",
+            "option_d": opts[3] if len(opts) > 3 else "",
+            "correct_answer": letters[answer_idx] if answer_idx < 4 else "A"
+        })
+    return mapped
+
+def get_fallback_questions(topic, count):
+    qs = FALLBACK_QUESTIONS.get(topic, FALLBACK_QUESTIONS["cloud"])
+    selected = random.sample(qs, min(count, len(qs)))
+    return transform_questions(selected)
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
@@ -79,10 +150,11 @@ async def lifespan(app):
     await pubsub.subscribe("quiz_events")
     asyncio.create_task(redis_listener())
     try:
+        import boto3
         lambda_client = boto3.client("lambda", region_name=AWS_REGION)
         logger.info("Lambda client initialized (boto3)")
     except Exception as e:
-        logger.warning(f"boto3 Lambda client failed: {e}, will use HTTP fallback")
+        logger.warning(f"boto3 Lambda client failed: {e}")
         lambda_client = None
     logger.info("Started!"); yield
     await pubsub.unsubscribe("quiz_events"); await redis_client.close(); await engine.dispose()
@@ -112,64 +184,74 @@ async def health(): return {"status": "ok", "instance": INSTANCE_ID}
 @app.get("/metrics")
 async def metrics(): return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
-def transform_questions(raw_questions):
-    letters = ["A", "B", "C", "D"]
-    mapped = []
-    for q in raw_questions:
-        opts = q.get("options", [])
-        answer_idx = q.get("answer", 0)
-        mapped.append({
-            "question_text": q.get("q", ""),
-            "option_a": opts[0] if len(opts) > 0 else "",
-            "option_b": opts[1] if len(opts) > 1 else "",
-            "option_c": opts[2] if len(opts) > 2 else "",
-            "option_d": opts[3] if len(opts) > 3 else "",
-            "correct_answer": letters[answer_idx] if answer_idx < 4 else "A"
-        })
-    return mapped
-
 @app.get("/api/generate-questions")
 async def generate_questions(topic: str = "cloud", count: int = 5):
     start = time.time()
     try:
+        result = None
         if lambda_client:
-            payload = json.dumps({"rawPath": "/generate", "queryStringParameters": {"topic": topic, "count": str(count)}})
-            resp = lambda_client.invoke(FunctionName=LAMBDA_FUNCTION_NAME, Payload=payload)
-            result = json.loads(resp["Payload"].read())
-            if "body" in result:
-                result = json.loads(result["body"])
-        else:
-            async with httpx.AsyncClient(timeout=10) as client:
-                url = LAMBDA_URL.rstrip("/")
-                resp = await client.get(f"{url}/generate", params={"topic": topic, "count": count})
-                resp.raise_for_status()
-                result = resp.json()
-        if "questions" in result:
-            result["questions"] = transform_questions(result["questions"])
+            try:
+                payload = json.dumps({"rawPath": "/generate", "queryStringParameters": {"topic": topic, "count": str(count)}})
+                resp = lambda_client.invoke(FunctionName=LAMBDA_FUNCTION_NAME, Payload=payload)
+                raw = json.loads(resp["Payload"].read())
+                if "body" in raw:
+                    raw = json.loads(raw["body"])
+                if "questions" in raw:
+                    result = {"questions": transform_questions(raw["questions"]), "category": topic, "source": "lambda"}
+            except Exception as e:
+                logger.warning(f"Lambda failed, using fallback: {e}")
+        if not result:
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    url = LAMBDA_URL.rstrip("/")
+                    resp = await client.get(f"{url}/generate", params={"topic": topic, "count": count})
+                    resp.raise_for_status()
+                    raw = resp.json()
+                    if "questions" in raw:
+                        result = {"questions": transform_questions(raw["questions"]), "category": topic, "source": "lambda-url"}
+            except Exception as e:
+                logger.warning(f"HTTP Lambda failed, using fallback: {e}")
+        if not result:
+            result = {"questions": get_fallback_questions(topic, count), "category": topic, "source": "fallback"}
         LAMBDA_CALLS.labels(instance=INSTANCE_ID, status="success").inc()
         LAMBDA_LATENCY.labels(instance=INSTANCE_ID).observe(time.time() - start)
         return result
     except Exception as e:
         LAMBDA_CALLS.labels(instance=INSTANCE_ID, status="error").inc()
-        logger.error(f"Lambda error: {e}")
-        raise HTTPException(status_code=502, detail=str(e))
+        return {"questions": get_fallback_questions(topic, count), "category": topic, "source": "fallback-error"}
+
+async def get_room_state(room_id):
+    state = await redis_client.hgetall(f"room:{room_id}:state")
+    players = list(await redis_client.smembers(f"room:{room_id}:players"))
+    ready = list(await redis_client.smembers(f"room:{room_id}:ready"))
+    votes_raw = await redis_client.hgetall(f"room:{room_id}:votes")
+    return {"players": players, "ready": ready, "votes": votes_raw, "phase": state.get("phase", "lobby"), "question_idx": int(state.get("question_idx", "0")), "total_questions": int(state.get("total_questions", "0"))}
 
 @app.websocket("/ws/{room_id}/{username}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
     await manager.connect(websocket, room_id, username)
     WS_CONNECTIONS.labels(instance=INSTANCE_ID).inc()
     WS_ACTIVE.labels(instance=INSTANCE_ID).inc()
-    room_key = f"room:{room_id}:players"
-    await redis_client.sadd(room_key, username)
-    await redis_client.expire(room_key, 3600)
-    existing = await redis_client.smembers(room_key)
-    for p in existing:
+
+    await redis_client.sadd(f"room:{room_id}:players", username)
+    await redis_client.expire(f"room:{room_id}:players", 3600)
+
+    state = await get_room_state(room_id)
+    for p in state["players"]:
         if p != username:
             try: await websocket.send_text(json.dumps({"type": "player_joined", "room_id": room_id, "username": p, "source": "history"}))
-            except Exception: pass
+            except: pass
+    for p in state["ready"]:
+        try: await websocket.send_text(json.dumps({"type": "player_ready", "room_id": room_id, "username": p, "source": "history"}))
+        except: pass
+    for voter, topic in state["votes"].items():
+        try: await websocket.send_text(json.dumps({"type": "vote_topic", "room_id": room_id, "username": voter, "topic": topic, "source": "history"}))
+        except: pass
+
     join_msg = {"type": "player_joined", "room_id": room_id, "username": username, "source": INSTANCE_ID}
     await redis_client.publish("quiz_events", json.dumps(join_msg))
     await manager.broadcast_to_room(room_id, json.dumps(join_msg))
+
     try:
         while True:
             data = await websocket.receive_text()
@@ -177,18 +259,52 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
             message["room_id"] = room_id
             message["username"] = username
             message["source"] = INSTANCE_ID
-            if message.get("type") == "answer":
+            msg_type = message.get("type")
+
+            if msg_type == "player_ready":
+                await redis_client.sadd(f"room:{room_id}:ready", username)
+                await redis_client.expire(f"room:{room_id}:ready", 3600)
+
+            elif msg_type == "vote_topic":
+                await redis_client.hset(f"room:{room_id}:votes", username, message.get("topic", "cloud"))
+                await redis_client.expire(f"room:{room_id}:votes", 3600)
+
+            elif msg_type == "game_start":
+                await redis_client.hset(f"room:{room_id}:state", mapping={"phase": "playing", "question_idx": "0", "total_questions": str(message.get("total_questions", 5))})
+                if message.get("questions"):
+                    await redis_client.set(f"room:{room_id}:questions", json.dumps(message["questions"]), ex=3600)
+
+            elif msg_type == "new_question":
+                qn = message.get("question_number", 1)
+                await redis_client.hset(f"room:{room_id}:state", "question_idx", str(qn - 1))
+                await redis_client.hset(f"room:{room_id}:state", "phase", "playing")
+
+            elif msg_type == "reveal_answer":
+                await redis_client.hset(f"room:{room_id}:state", "phase", "reviewing")
+
+            elif msg_type == "game_finished":
+                await redis_client.hset(f"room:{room_id}:state", "phase", "finished")
+                await redis_client.delete(f"room:{room_id}:ready", f"room:{room_id}:votes", f"room:{room_id}:questions")
+
+            elif msg_type == "answer":
                 QUIZ_ANSWERS.labels(instance=INSTANCE_ID, correct=str(message.get("correct", False))).inc()
                 score_key = f"room:{room_id}:scores"
                 await redis_client.zincrby(score_key, message.get("points", 0), username)
+                await redis_client.expire(score_key, 3600)
                 lb = await redis_client.zrevrange(score_key, 0, -1, withscores=True)
                 message["leaderboard"] = [{"username": u, "score": int(s)} for u, s in lb]
+
+            elif msg_type == "back_to_lobby":
+                await redis_client.hset(f"room:{room_id}:state", mapping={"phase": "lobby", "question_idx": "0", "total_questions": "0"})
+                await redis_client.delete(f"room:{room_id}:ready", f"room:{room_id}:votes", f"room:{room_id}:questions", f"room:{room_id}:scores")
+
             await redis_client.publish("quiz_events", json.dumps(message))
             await manager.broadcast_to_room(room_id, json.dumps(message))
     except WebSocketDisconnect:
         manager.disconnect(websocket, room_id, username)
         WS_ACTIVE.labels(instance=INSTANCE_ID).dec()
-        await redis_client.srem(room_key, username)
+        await redis_client.srem(f"room:{room_id}:players", username)
+        await redis_client.srem(f"room:{room_id}:ready", username)
         leave_msg = {"type": "player_left", "room_id": room_id, "username": username, "source": INSTANCE_ID}
         await redis_client.publish("quiz_events", json.dumps(leave_msg))
         await manager.broadcast_to_room(room_id, json.dumps(leave_msg))
