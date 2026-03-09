@@ -9,6 +9,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from jose import jwt
 import redis.asyncio as aioredis
 import httpx
+import boto3
 from app.models.database import engine, Base
 from app.routers import quiz, users
 from app.models.manager import ConnectionManager
@@ -16,6 +17,8 @@ from app.models.manager import ConnectionManager
 INSTANCE_ID = os.getenv("INSTANCE_ID", "unknown")
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 LAMBDA_URL = os.getenv("LAMBDA_URL", "http://lambda-mock:9000")
+LAMBDA_FUNCTION_NAME = os.getenv("LAMBDA_FUNCTION_NAME", "quiz-arena-questions")
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 JWT_SECRET = os.getenv("JWT_SECRET", "quiz-arena-secret-key")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quiz-arena")
@@ -31,6 +34,7 @@ LAMBDA_LATENCY = Histogram("lambda_latency_seconds", "Lambda latency", ["instanc
 redis_client = None
 manager = ConnectionManager()
 pubsub = None
+lambda_client = None
 
 def create_token(username):
     return jwt.encode({"sub": username, "exp": datetime.utcnow() + timedelta(hours=24)}, JWT_SECRET, algorithm="HS256")
@@ -68,12 +72,18 @@ async def wait_for_db(retries=30, delay=2):
 
 @asynccontextmanager
 async def lifespan(app):
-    global redis_client, pubsub
+    global redis_client, pubsub, lambda_client
     await wait_for_db()
     redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
     pubsub = redis_client.pubsub()
     await pubsub.subscribe("quiz_events")
     asyncio.create_task(redis_listener())
+    try:
+        lambda_client = boto3.client("lambda", region_name=AWS_REGION)
+        logger.info("Lambda client initialized (boto3)")
+    except Exception as e:
+        logger.warning(f"boto3 Lambda client failed: {e}, will use HTTP fallback")
+        lambda_client = None
     logger.info("Started!"); yield
     await pubsub.unsubscribe("quiz_events"); await redis_client.close(); await engine.dispose()
 
@@ -102,18 +112,46 @@ async def health(): return {"status": "ok", "instance": INSTANCE_ID}
 @app.get("/metrics")
 async def metrics(): return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
+def transform_questions(raw_questions):
+    letters = ["A", "B", "C", "D"]
+    mapped = []
+    for q in raw_questions:
+        opts = q.get("options", [])
+        answer_idx = q.get("answer", 0)
+        mapped.append({
+            "question_text": q.get("q", ""),
+            "option_a": opts[0] if len(opts) > 0 else "",
+            "option_b": opts[1] if len(opts) > 1 else "",
+            "option_c": opts[2] if len(opts) > 2 else "",
+            "option_d": opts[3] if len(opts) > 3 else "",
+            "correct_answer": letters[answer_idx] if answer_idx < 4 else "A"
+        })
+    return mapped
+
 @app.get("/api/generate-questions")
 async def generate_questions(topic: str = "cloud", count: int = 5):
     start = time.time()
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(f"{LAMBDA_URL}/generate", params={"topic": topic, "count": count})
-            resp.raise_for_status(); result = resp.json()
+        if lambda_client:
+            payload = json.dumps({"rawPath": "/generate", "queryStringParameters": {"topic": topic, "count": str(count)}})
+            resp = lambda_client.invoke(FunctionName=LAMBDA_FUNCTION_NAME, Payload=payload)
+            result = json.loads(resp["Payload"].read())
+            if "body" in result:
+                result = json.loads(result["body"])
+        else:
+            async with httpx.AsyncClient(timeout=10) as client:
+                url = LAMBDA_URL.rstrip("/")
+                resp = await client.get(f"{url}/generate", params={"topic": topic, "count": count})
+                resp.raise_for_status()
+                result = resp.json()
+        if "questions" in result:
+            result["questions"] = transform_questions(result["questions"])
         LAMBDA_CALLS.labels(instance=INSTANCE_ID, status="success").inc()
         LAMBDA_LATENCY.labels(instance=INSTANCE_ID).observe(time.time() - start)
         return result
     except Exception as e:
         LAMBDA_CALLS.labels(instance=INSTANCE_ID, status="error").inc()
+        logger.error(f"Lambda error: {e}")
         raise HTTPException(status_code=502, detail=str(e))
 
 @app.websocket("/ws/{room_id}/{username}")

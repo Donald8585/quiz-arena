@@ -3,4 +3,5 @@ WORKDIR /app
 COPY package.json .
 RUN npm install
 COPY . .
-CMD ["npx", "next", "dev", "--hostname", "0.0.0.0"]
+RUN npx next build
+CMD ["npx", "next", "start", "--hostname", "0.0.0.0"]
