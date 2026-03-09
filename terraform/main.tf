@@ -89,7 +89,14 @@ resource "aws_security_group" "ec2_sg" {
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "Nginx reverse proxy"
+    description = "HTTP (redirects to HTTPS)"
+  }
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS"
   }
   ingress {
     from_port   = 3000
@@ -244,15 +251,32 @@ resource "aws_lambda_function_url" "quiz_questions_url" {
   authorization_type = "NONE"
 }
 
+# ==================== NETWORK INTERFACES (breaks circular dependency) ====================
+
+resource "aws_network_interface" "app_eni" {
+  subnet_id       = data.aws_subnets.default.ids[0]
+  security_groups = [aws_security_group.ec2_sg.id]
+  tags            = { Name = "quiz-arena-app-eni" }
+}
+
+resource "aws_network_interface" "worker_eni" {
+  subnet_id       = data.aws_subnets.default.ids[1]
+  security_groups = [aws_security_group.ec2_sg.id]
+  tags            = { Name = "quiz-arena-worker-eni" }
+}
+
 # ==================== EC2 #1 — App Server ====================
 
 resource "aws_instance" "app_server" {
-  ami                    = var.ami_id
-  instance_type          = "t2.micro"
-  key_name               = var.key_name
-  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
-  subnet_id              = data.aws_subnets.default.ids[0]
-  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
+  ami                  = var.ami_id
+  instance_type        = "t2.micro"
+  key_name             = var.key_name
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
+
+  network_interface {
+    network_interface_id = aws_network_interface.app_eni.id
+    device_index         = 0
+  }
 
   root_block_device {
     volume_size = 30
@@ -264,40 +288,47 @@ resource "aws_instance" "app_server" {
     set -e
     exec > /var/log/quiz-arena-deploy.log 2>&1
 
-    echo "=== [1/8] System update ==="
+    echo "=== [1/9] System update ==="
     sudo yum update -y
-    sudo yum install -y docker git
+    sudo yum install -y docker git openssl
 
-    echo "=== [2/8] Docker setup ==="
+    echo "=== [2/9] Docker setup ==="
     sudo systemctl start docker
     sudo systemctl enable docker
     sudo usermod -aG docker ec2-user
 
-    echo "=== [3/8] Docker Compose v2 ==="
+    echo "=== [3/9] Docker Compose v2 ==="
     sudo mkdir -p /usr/local/lib/docker/cli-plugins
     sudo curl -SL -L "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" \
       -o /usr/local/lib/docker/cli-plugins/docker-compose
     sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
-    echo "=== [4/8] Docker Buildx ==="
+    echo "=== [4/9] Docker Buildx ==="
     BUILDX_URL=$(curl -s https://api.github.com/repos/docker/buildx/releases/latest | grep "browser_download_url.*linux-amd64\"" | cut -d '"' -f 4)
     sudo curl -SL -L "$BUILDX_URL" \
       -o /usr/local/lib/docker/cli-plugins/docker-buildx
     sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
 
-    echo "=== [5/8] Enable 2GB swap ==="
+    echo "=== [5/9] Enable 2GB swap ==="
     sudo dd if=/dev/zero of=/swapfile bs=128M count=16
     sudo chmod 600 /swapfile
     sudo mkswap /swapfile
     sudo swapon /swapfile
     echo "/swapfile swap swap defaults 0 0" | sudo tee -a /etc/fstab
 
-    echo "=== [6/8] Clone repo ==="
+    echo "=== [6/9] Clone repo ==="
     cd /home/ec2-user
     git clone https://github.com/${var.github_repo}.git quiz-arena
     cd quiz-arena
 
-    echo "=== [7/8] Write .env and nginx.conf ==="
+    echo "=== [7/9] Generate self-signed SSL certificate ==="
+    mkdir -p nginx/ssl
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+      -keyout nginx/ssl/key.pem \
+      -out nginx/ssl/cert.pem \
+      -subj "/C=US/ST=Virginia/L=Ashburn/O=QuizArena/CN=quiz-arena.aws"
+
+    echo "=== [8/9] Write .env and nginx.conf ==="
     cat > .env << ENVEOF
     DATABASE_URL=postgresql://${var.db_username}:${var.db_password}@${aws_db_instance.postgres.endpoint}/quizdb
     REDIS_URL=redis://${aws_elasticache_cluster.redis.cache_nodes[0].address}:6379
@@ -310,24 +341,45 @@ resource "aws_instance" "app_server" {
     http {
         upstream backend_api {
             server backend1:8000;
-            server ${aws_instance.worker_server.private_ip}:8000;
+            server ${aws_network_interface.worker_eni.private_ip}:8000;
         }
         upstream backend_ws {
             ip_hash;
             server backend1:8000;
-            server ${aws_instance.worker_server.private_ip}:8000;
+            server ${aws_network_interface.worker_eni.private_ip}:8000;
         }
         map $http_upgrade $connection_upgrade {
             default upgrade;
             '' close;
         }
+
         server {
             listen 80;
+            server_name _;
+            return 301 https://$host$request_uri;
+        }
+
+        server {
+            listen 443 ssl;
+            server_name _;
+
+            ssl_certificate     /etc/nginx/ssl/cert.pem;
+            ssl_certificate_key /etc/nginx/ssl/key.pem;
+            ssl_protocols       TLSv1.2 TLSv1.3;
+            ssl_ciphers         HIGH:!aNULL:!MD5;
+            ssl_prefer_server_ciphers on;
+
+            add_header X-Frame-Options "SAMEORIGIN" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header X-XSS-Protection "1; mode=block" always;
+            add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
             location /api/ {
                 proxy_pass http://backend_api;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
             }
             location /health { proxy_pass http://backend_api; }
             location /metrics { proxy_pass http://backend_api; }
@@ -337,6 +389,7 @@ resource "aws_instance" "app_server" {
                 proxy_set_header Upgrade $http_upgrade;
                 proxy_set_header Connection $connection_upgrade;
                 proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-Proto $scheme;
                 proxy_read_timeout 86400;
                 proxy_send_timeout 86400;
             }
@@ -344,7 +397,7 @@ resource "aws_instance" "app_server" {
     }
     NGINXCONF
 
-    echo "=== [8/8] Build & deploy (step-by-step) ==="
+    echo "=== [9/9] Build & deploy (step-by-step) ==="
     sudo docker compose -f docker-compose.server1.yml pull nginx
     sudo docker compose -f docker-compose.server1.yml build backend1
     sudo docker compose -f docker-compose.server1.yml build frontend
@@ -354,19 +407,22 @@ resource "aws_instance" "app_server" {
     echo "App Server deployed at $(date)" > /home/ec2-user/deploy.log
   USERDATA
 
-  depends_on = [aws_db_instance.postgres, aws_elasticache_cluster.redis, aws_instance.worker_server]
+  depends_on = [aws_db_instance.postgres, aws_elasticache_cluster.redis]
   tags       = { Name = "quiz-arena-app-server" }
 }
 
 # ==================== EC2 #2 — Worker Server ====================
 
 resource "aws_instance" "worker_server" {
-  ami                    = var.ami_id
-  instance_type          = "t2.micro"
-  key_name               = var.key_name
-  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
-  subnet_id              = data.aws_subnets.default.ids[1]
-  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
+  ami                  = var.ami_id
+  instance_type        = "t2.micro"
+  key_name             = var.key_name
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
+
+  network_interface {
+    network_interface_id = aws_network_interface.worker_eni.id
+    device_index         = 0
+  }
 
   root_block_device {
     volume_size = 30
@@ -428,7 +484,7 @@ resource "aws_instance" "worker_server" {
           - targets: ['backend2:8000']
       - job_name: 'nginx-remote'
         static_configs:
-          - targets: ['${aws_instance.app_server.private_ip}:80']
+          - targets: ['${aws_network_interface.app_eni.private_ip}:80']
     PROMEOF
 
     echo "=== [8/8] Build & deploy (step-by-step) ==="
@@ -447,13 +503,15 @@ resource "aws_instance" "worker_server" {
 # ==================== Elastic IPs ====================
 
 resource "aws_eip" "app_eip" {
-  instance = aws_instance.app_server.id
-  domain   = "vpc"
-  tags     = { Name = "quiz-arena-app-eip" }
+  network_interface = aws_network_interface.app_eni.id
+  domain            = "vpc"
+  tags              = { Name = "quiz-arena-app-eip" }
+  depends_on        = [aws_instance.app_server]
 }
 
 resource "aws_eip" "worker_eip" {
-  instance = aws_instance.worker_server.id
-  domain   = "vpc"
-  tags     = { Name = "quiz-arena-worker-eip" }
+  network_interface = aws_network_interface.worker_eni.id
+  domain            = "vpc"
+  tags              = { Name = "quiz-arena-worker-eip" }
+  depends_on        = [aws_instance.worker_server]
 }
