@@ -1,109 +1,60 @@
 terraform {
   required_providers {
     aws = { source = "hashicorp/aws", version = "~> 5.0" }
-    archive = { source = "hashicorp/archive", version = "~> 2.0" }
   }
+  required_version = ">= 1.5.0"
 }
 
-provider "aws" { region = "us-east-1" }
+provider "aws" {
+  region = var.aws_region
+}
 
-# ─── Data Sources ───
 data "aws_vpc" "default" { default = true }
-data "aws_availability_zones" "available" { state = "available" }
 data "aws_subnets" "default" {
   filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
+  name   = "vpc-id"
+  values = [data.aws_vpc.default.id]
 }
-
-# ─── Lambda (quiz questions) ───
-data "archive_file" "lambda_zip" {
-  type        = "zip"
-  source_dir  = "${path.module}/../lambda-function"
-  output_path = "${path.module}/lambda.zip"
 }
+data "aws_availability_zones" "available" { state = "available" }
 
-resource "aws_iam_role" "lambda_role" {
-  name = "quiz-arena-lambda-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{ Action = "sts:AssumeRole", Effect = "Allow", Principal = { Service = "lambda.amazonaws.com" } }]
-  })
-}
+# ==================== SECURITY GROUPS ====================
 
-resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_lambda_function" "quiz_questions" {
-  filename         = data.archive_file.lambda_zip.output_path
-  function_name    = "quiz-arena-questions"
-  role             = aws_iam_role.lambda_role.arn
-  handler          = "handler.lambda_handler"
-  runtime          = "python3.12"
-  timeout          = 10
-  memory_size      = 128
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
-  tags             = { Name = "quiz-arena-lambda" }
-}
-
-resource "aws_lambda_function_url" "quiz_questions_url" {
-  function_name      = aws_lambda_function.quiz_questions.function_name
-  authorization_type = "NONE"
-}
-
-# ─── Security Groups ───
 resource "aws_security_group" "ec2_sg" {
   name        = "quiz-arena-ec2-sg"
-  description = "EC2 ports for Quiz Arena"
+  description = "EC2 ports"
   vpc_id      = data.aws_vpc.default.id
 
-  ingress {
-    description = "SSH"
-    from_port   = 22; to_port = 22; protocol = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    description = "HTTP"
-    from_port   = 80; to_port = 80; protocol = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    description = "HTTPS"
-    from_port   = 443; to_port = 443; protocol = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    description = "Frontend"
-    from_port   = 3000; to_port = 3000; protocol = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    description = "Grafana"
-    from_port   = 3001; to_port = 3001; protocol = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    description = "Prometheus"
-    from_port   = 9090; to_port = 9090; protocol = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    description = "Backend cross-server"
-    from_port   = 8000; to_port = 8000; protocol = "tcp"
-    self        = true
-  }
-  ingress {
-    description = "Node exporter metrics"
-    from_port   = 9100; to_port = 9100; protocol = "tcp"
-    self        = true
-  }
-  egress {
-    from_port   = 0; to_port = 0; protocol = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  ingress { from_port = 22
+  to_port = 22
+  protocol = "tcp"
+  cidr_blocks = [var.my_ip]
+  description = "SSH" }
+  ingress { from_port = 80
+  to_port = 80
+  protocol = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+  description = "Nginx" }
+  ingress { from_port = 3000
+  to_port = 3000
+  protocol = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+  description = "Frontend" }
+  ingress { from_port = 3001
+  to_port = 3001
+  protocol = "tcp"
+  cidr_blocks = ["0.0.0.0/0"]
+  description = "Grafana" }
+  ingress { from_port = 9090
+  to_port = 9090
+  protocol = "tcp"
+  cidr_blocks = [var.my_ip]
+  description = "Prometheus" }
+  egress  { from_port = 0
+  to_port = 0
+  protocol = "-1"
+  cidr_blocks = ["0.0.0.0/0"] }
+
   tags = { Name = "quiz-arena-ec2-sg" }
 }
 
@@ -113,14 +64,17 @@ resource "aws_security_group" "rds_sg" {
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
-    description     = "PostgreSQL from EC2"
-    from_port       = 5432; to_port = 5432; protocol = "tcp"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
     security_groups = [aws_security_group.ec2_sg.id]
+    description     = "PostgreSQL from EC2"
   }
-  egress {
-    from_port   = 0; to_port = 0; protocol = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  egress { from_port = 0
+  to_port = 0
+  protocol = "-1"
+  cidr_blocks = ["0.0.0.0/0"] }
+
   tags = { Name = "quiz-arena-rds-sg" }
 }
 
@@ -130,18 +84,22 @@ resource "aws_security_group" "redis_sg" {
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
-    description     = "Redis from EC2"
-    from_port       = 6379; to_port = 6379; protocol = "tcp"
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
     security_groups = [aws_security_group.ec2_sg.id]
+    description     = "Redis from EC2"
   }
-  egress {
-    from_port   = 0; to_port = 0; protocol = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  egress { from_port = 0
+  to_port = 0
+  protocol = "-1"
+  cidr_blocks = ["0.0.0.0/0"] }
+
   tags = { Name = "quiz-arena-redis-sg" }
 }
 
-# ─── RDS ───
+# ==================== RDS (Free Tier) ====================
+
 resource "aws_db_instance" "postgres" {
   identifier           = "quiz-arena-db"
   engine               = "postgres"
@@ -150,139 +108,94 @@ resource "aws_db_instance" "postgres" {
   allocated_storage    = 20
   storage_type         = "gp2"
   db_name              = "quizdb"
-  username             = "quizuser"
-  password             = "QuizArena2026!"
-  publicly_accessible  = false
+  username             = var.db_username
+  password             = var.db_password
   skip_final_snapshot  = true
+  publicly_accessible  = false
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
+
   tags = { Name = "quiz-arena-db" }
 }
 
-# ─── ElastiCache Redis ───
+# ==================== ElastiCache Redis (Free Tier) ====================
+
 resource "aws_elasticache_subnet_group" "redis_subnet" {
   name       = "quiz-arena-redis-subnet"
   subnet_ids = data.aws_subnets.default.ids
 }
 
 resource "aws_elasticache_cluster" "redis" {
-  cluster_id         = "quiz-arena-redis"
-  engine             = "redis"
-  node_type          = "cache.t3.micro"
-  num_cache_nodes    = 1
-  subnet_group_name  = aws_elasticache_subnet_group.redis_subnet.name
-  security_group_ids = [aws_security_group.redis_sg.id]
-  port               = 6379
-  tags               = { Name = "quiz-arena-redis" }
+  cluster_id           = "quiz-arena-redis"
+  engine               = "redis"
+  node_type            = "cache.t3.micro"
+  num_cache_nodes      = 1
+  port                 = 6379
+  security_group_ids   = [aws_security_group.redis_sg.id]
+  subnet_group_name    = aws_elasticache_subnet_group.redis_subnet.name
+
+  tags = { Name = "quiz-arena-redis" }
 }
 
-# ─── IAM for EC2 ───
-resource "aws_iam_role" "ec2_role" {
-  name = "quiz-arena-ec2-role"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{ Action = "sts:AssumeRole", Effect = "Allow", Principal = { Service = "ec2.amazonaws.com" } }]
-  })
-}
+# ==================== EC2 (Free Tier) ====================
 
-resource "aws_iam_role_policy" "ec2_lambda_invoke" {
-  name = "lambda-invoke"
-  role = aws_iam_role.ec2_role.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["lambda:InvokeFunction", "lambda:InvokeFunctionUrl"]
-      Resource = aws_lambda_function.quiz_questions.arn
-    }]
-  })
-}
-
-resource "aws_iam_instance_profile" "ec2_profile" {
-  name = "quiz-arena-ec2-profile"
-  role = aws_iam_role.ec2_role.name
-}
-
-# ─── Network Interfaces + EIPs ───
-resource "aws_network_interface" "app_eni" {
-  subnet_id       = data.aws_subnets.default.ids[0]
-  security_groups = [aws_security_group.ec2_sg.id]
-  tags            = { Name = "quiz-arena-app-eni" }
-}
-resource "aws_network_interface" "worker_eni" {
-  subnet_id       = data.aws_subnets.default.ids[1]
-  security_groups = [aws_security_group.ec2_sg.id]
-  tags            = { Name = "quiz-arena-worker-eni" }
-}
-
-# ─── EC2: App Server (nginx + backend1 + frontend) ───
-resource "aws_instance" "app_server" {
-  ami                  = "ami-0f3caa1cf4417e51b"
-  instance_type        = "t2.micro"
-  key_name             = "quiz-arena-key"
-  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
-
-  network_interface {
-    device_index         = 0
-    network_interface_id = aws_network_interface.app_eni.id
-  }
+resource "aws_instance" "quiz_arena" {
+  ami                    = var.ami_id
+  instance_type          = "t2.micro"
+  key_name               = var.key_name
+  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
+  subnet_id              = data.aws_subnets.default.ids[0]
 
   root_block_device {
     volume_size = 30
     volume_type = "gp2"
   }
 
-  user_data = templatefile("${path.module}/user_data_app.sh.tpl", {
-    db_endpoint    = aws_db_instance.postgres.endpoint
-    redis_endpoint = aws_elasticache_cluster.redis.cache_nodes[0].address
-    lambda_url     = aws_lambda_function_url.quiz_questions_url.function_url
-    worker_private_ip = aws_network_interface.worker_eni.private_ip
-    github_repo    = "https://github.com/Donald8585/quiz-arena.git"
-  })
+  user_data = <<-USERDATA
+    #!/bin/bash
+    set -e
 
-  tags = { Name = "quiz-arena-app-server" }
+    # System update
+    sudo yum update -y
+    sudo yum install -y docker git
+
+    # Docker
+    sudo systemctl start docker
+    sudo systemctl enable docker
+    sudo usermod -aG docker ec2-user
+
+    # Docker Compose v2
+    sudo mkdir -p /usr/local/lib/docker/cli-plugins
+    sudo curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)"       -o /usr/local/lib/docker/cli-plugins/docker-compose
+    sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+    # Enable 2GB swap (critical for t2.micro!)
+    sudo dd if=/dev/zero of=/swapfile bs=128M count=16
+    sudo chmod 600 /swapfile
+    sudo mkswap /swapfile
+    sudo swapon /swapfile
+    echo "/swapfile swap swap defaults 0 0" | sudo tee -a /etc/fstab
+
+    # Clone and deploy
+    cd /home/ec2-user
+    git clone https://github.com/${var.github_repo}.git quiz-arena
+    cd quiz-arena
+
+    # Write .env with RDS + ElastiCache endpoints
+    cat > .env << 'ENVEOF'
+    DATABASE_URL=postgresql://${var.db_username}:${var.db_password}@${aws_db_instance.postgres.endpoint}/quizdb
+    REDIS_URL=redis://${aws_elasticache_cluster.redis.cache_nodes[0].address}:6379
+    ENVEOF
+
+    sudo docker compose up --build -d
+    echo "Quiz Arena FREE TIER deployed at $(date)" > /home/ec2-user/deploy.log
+  USERDATA
+
   depends_on = [aws_db_instance.postgres, aws_elasticache_cluster.redis]
+  tags = { Name = "quiz-arena-server" }
 }
 
-# ─── EC2: Worker Server (backend2 + prometheus + grafana) ───
-resource "aws_instance" "worker_server" {
-  ami                  = "ami-0f3caa1cf4417e51b"
-  instance_type        = "t2.micro"
-  key_name             = "quiz-arena-key"
-  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
-
-  network_interface {
-    device_index         = 0
-    network_interface_id = aws_network_interface.worker_eni.id
-  }
-
-  root_block_device {
-    volume_size = 30
-    volume_type = "gp2"
-  }
-
-  user_data = templatefile("${path.module}/user_data_worker.sh.tpl", {
-    db_endpoint    = aws_db_instance.postgres.endpoint
-    redis_endpoint = aws_elasticache_cluster.redis.cache_nodes[0].address
-    lambda_url     = aws_lambda_function_url.quiz_questions_url.function_url
-    app_private_ip = aws_network_interface.app_eni.private_ip
-    github_repo    = "https://github.com/Donald8585/quiz-arena.git"
-  })
-
-  tags = { Name = "quiz-arena-worker-server" }
-  depends_on = [aws_db_instance.postgres, aws_elasticache_cluster.redis]
-}
-
-# ─── EIPs ───
-resource "aws_eip" "app_eip" {
-  network_interface = aws_network_interface.app_eni.id
-  domain            = "vpc"
-  tags              = { Name = "quiz-arena-app-eip" }
-  depends_on        = [aws_instance.app_server]
-}
-
-resource "aws_eip" "worker_eip" {
-  network_interface = aws_network_interface.worker_eni.id
-  domain            = "vpc"
-  tags              = { Name = "quiz-arena-worker-eip" }
-  depends_on        = [aws_instance.worker_server]
+resource "aws_eip" "quiz_arena_eip" {
+  instance = aws_instance.quiz_arena.id
+  domain   = "vpc"
+  tags     = { Name = "quiz-arena-eip" }
 }
