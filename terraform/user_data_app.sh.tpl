@@ -121,6 +121,13 @@ services:
     restart: unless-stopped
     mem_limit: 256m
 
+  node-exporter:
+    image: prom/node-exporter:latest
+    ports: ["9100:9100"]
+    networks: [quiznet]
+    restart: unless-stopped
+    mem_limit: 32m
+
 networks:
   quiznet:
     driver: bridge

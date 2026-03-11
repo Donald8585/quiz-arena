@@ -75,7 +75,7 @@ networks:
 DCEOF
 
 mkdir -p monitoring
-cat > monitoring/prometheus.yml << PROMEOF
+cat > monitoring/prometheus.yml << 'PROMEOF'
 global:
   scrape_interval: 15s
 
@@ -83,30 +83,32 @@ scrape_configs:
   - job_name: "backend1"
     metrics_path: /metrics
     static_configs:
-      - targets: ["${app_private_ip}:8000"]
+      - targets: ["APP_IP_PLACEHOLDER:8000"]
         labels:
           instance: "backend1"
 
   - job_name: "backend2"
     metrics_path: /metrics
     static_configs:
-      - targets: ["localhost:8000"]
+      - targets: ["backend2:8000"]
         labels:
           instance: "backend2"
 
   - job_name: "nginx"
     metrics_path: /metrics
     static_configs:
-      - targets: ["${app_private_ip}:80"]
+      - targets: ["APP_IP_PLACEHOLDER:80"]
 
   - job_name: "node-app"
     static_configs:
-      - targets: ["${app_private_ip}:9100"]
+      - targets: ["APP_IP_PLACEHOLDER:9100"]
 
   - job_name: "node-worker"
     static_configs:
       - targets: ["node-exporter:9100"]
 PROMEOF
+
+sed -i "s/APP_IP_PLACEHOLDER/${app_private_ip}/g" monitoring/prometheus.yml
 
 docker compose -f docker-compose.server2.yml up -d --build
 
