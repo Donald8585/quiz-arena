@@ -2,7 +2,6 @@
 exec > /var/log/quiz-arena-deploy.log 2>&1
 set -ex
 
-# Install Docker
 dnf update -y
 dnf install -y docker git
 systemctl enable docker && systemctl start docker
@@ -13,15 +12,18 @@ curl -SL "https://github.com/docker/compose/releases/latest/download/docker-comp
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
-# Add ec2-user to docker group
+# Install buildx (AL2023 ships broken v0.0.0)
+BUILDX_URL="https://github.com/docker/buildx/releases/download/v0.19.3/buildx-v0.19.3.linux-amd64"
+mkdir -p /usr/libexec/docker/cli-plugins
+curl -SL "$BUILDX_URL" -o /usr/libexec/docker/cli-plugins/docker-buildx
+chmod +x /usr/libexec/docker/cli-plugins/docker-buildx
+
 usermod -aG docker ec2-user
 
-# Clone repo
 cd /home/ec2-user
 sudo -u ec2-user git clone ${github_repo} quiz-arena || true
 cd quiz-arena
 
-# Write .env
 cat > .env << ENVEOF
 DATABASE_URL=postgresql://quizuser:QuizArena2026!@${db_endpoint}/quizdb
 REDIS_URL=redis://${redis_endpoint}:6379
@@ -29,7 +31,6 @@ LAMBDA_URL=${lambda_url}
 APP_BACKEND_URL=http://${app_private_ip}:8000
 ENVEOF
 
-# Write docker-compose for worker server
 cat > docker-compose.server2.yml << 'DCEOF'
 services:
   backend2:
@@ -75,7 +76,6 @@ networks:
     driver: bridge
 DCEOF
 
-# Write Prometheus config
 mkdir -p monitoring
 cat > monitoring/prometheus.yml << PROMEOF
 global:
@@ -110,7 +110,6 @@ scrape_configs:
       - targets: ["node-exporter:9100"]
 PROMEOF
 
-# Build & launch
 docker compose -f docker-compose.server2.yml up -d --build
 
 echo "=== WORKER SERVER DEPLOY COMPLETE ==="
