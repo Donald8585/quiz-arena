@@ -6,13 +6,11 @@ dnf update -y
 dnf install -y docker git
 systemctl enable docker && systemctl start docker
 
-# Install Docker Compose plugin
 mkdir -p /usr/local/lib/docker/cli-plugins
 curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
-# Install buildx (AL2023 ships broken v0.0.0)
 BUILDX_URL="https://github.com/docker/buildx/releases/download/v0.19.3/buildx-v0.19.3.linux-amd64"
 mkdir -p /usr/libexec/docker/cli-plugins
 curl -SL "$BUILDX_URL" -o /usr/libexec/docker/cli-plugins/docker-buildx
@@ -32,20 +30,20 @@ WORKER_BACKEND_URL=http://${worker_private_ip}:8000
 ENVEOF
 
 mkdir -p nginx
-cat > nginx/nginx.conf << NGINXEOF
+cat > nginx/nginx.conf << 'NGINXEOF'
 events { worker_connections 1024; }
 
 http {
     resolver 127.0.0.11 valid=10s ipv6=off;
 
-    map \$$http_upgrade \$$connection_upgrade {
+    map $http_upgrade $connection_upgrade {
         default upgrade;
         ''      close;
     }
 
     upstream backends {
         server backend1:8000;
-        server ${worker_private_ip}:8000;
+        server WORKER_IP_PLACEHOLDER:8000;
     }
 
     server {
@@ -53,41 +51,43 @@ http {
         server_name _;
 
         location / {
-            set \$$frontend http://frontend:3000;
-            proxy_pass \$$frontend;
-            proxy_set_header Host \$$host;
-            proxy_set_header X-Real-IP \$$remote_addr;
+            set $frontend http://frontend:3000;
+            proxy_pass $frontend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
         }
 
         location /api/ {
             proxy_pass http://backends;
-            proxy_set_header Host \$$host;
-            proxy_set_header X-Real-IP \$$remote_addr;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
         }
 
         location /health {
             proxy_pass http://backends;
-            proxy_set_header Host \$$host;
+            proxy_set_header Host $host;
         }
 
         location /metrics {
-            set \$$backend http://backend1:8000;
-            proxy_pass \$$backend;
+            set $backend http://backend1:8000;
+            proxy_pass $backend;
         }
 
         location /ws/ {
             proxy_pass http://backends;
             proxy_http_version 1.1;
-            proxy_set_header Upgrade \$$http_upgrade;
-            proxy_set_header Connection \$$connection_upgrade;
-            proxy_set_header Host \$$host;
-            proxy_set_header X-Real-IP \$$remote_addr;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $connection_upgrade;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
             proxy_read_timeout 86400;
             proxy_send_timeout 86400;
         }
     }
 }
 NGINXEOF
+
+sed -i "s/WORKER_IP_PLACEHOLDER/${worker_private_ip}/" nginx/nginx.conf
 
 cat > docker-compose.server1.yml << 'DCEOF'
 services:

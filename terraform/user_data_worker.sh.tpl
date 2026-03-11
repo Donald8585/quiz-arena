@@ -6,13 +6,11 @@ dnf update -y
 dnf install -y docker git
 systemctl enable docker && systemctl start docker
 
-# Install Docker Compose plugin
 mkdir -p /usr/local/lib/docker/cli-plugins
 curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
-# Install buildx (AL2023 ships broken v0.0.0)
 BUILDX_URL="https://github.com/docker/buildx/releases/download/v0.19.3/buildx-v0.19.3.linux-amd64"
 mkdir -p /usr/libexec/docker/cli-plugins
 curl -SL "$BUILDX_URL" -o /usr/libexec/docker/cli-plugins/docker-buildx
