@@ -22,7 +22,7 @@ sudo -u ec2-user git clone ${github_repo} quiz-arena || true
 cd quiz-arena
 
 # Write .env
-cat > .env << 'ENVEOF'
+cat > .env << ENVEOF
 DATABASE_URL=postgresql://quizuser:QuizArena2026!@${db_endpoint}/quizdb
 REDIS_URL=redis://${redis_endpoint}:6379
 LAMBDA_URL=${lambda_url}
@@ -34,12 +34,10 @@ cat > docker-compose.server2.yml << 'DCEOF'
 services:
   backend2:
     build: ./backend
+    env_file: .env
     environment:
       - INSTANCE_ID=backend2
       - SERVER_ROLE=worker-server
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - DATABASE_URL=${DATABASE_URL:-postgresql://quizuser:quizpass@postgres:5432/quizdb}
-      - LAMBDA_URL=${LAMBDA_URL:-http://localhost:9000}
     ports: ["8000:8000"]
     networks: [quiznet]
     restart: unless-stopped
@@ -79,7 +77,7 @@ DCEOF
 
 # Write Prometheus config
 mkdir -p monitoring
-cat > monitoring/prometheus.yml << 'PROMEOF'
+cat > monitoring/prometheus.yml << PROMEOF
 global:
   scrape_interval: 15s
 
@@ -94,7 +92,7 @@ scrape_configs:
   - job_name: "backend2"
     metrics_path: /metrics
     static_configs:
-      - targets: ["backend2:8000"]
+      - targets: ["localhost:8000"]
         labels:
           instance: "backend2"
 

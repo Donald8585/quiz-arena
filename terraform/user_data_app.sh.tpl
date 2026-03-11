@@ -22,7 +22,7 @@ sudo -u ec2-user git clone ${github_repo} quiz-arena || true
 cd quiz-arena
 
 # Write .env
-cat > .env << 'ENVEOF'
+cat > .env << ENVEOF
 DATABASE_URL=postgresql://quizuser:QuizArena2026!@${db_endpoint}/quizdb
 REDIS_URL=redis://${redis_endpoint}:6379
 LAMBDA_URL=${lambda_url}
@@ -31,14 +31,15 @@ ENVEOF
 
 # Write nginx config — load-balances to both backends
 mkdir -p nginx
-cat > nginx/nginx.conf << 'NGINXEOF'
+cat > nginx/nginx.conf << NGINXEOF
 events { worker_connections 1024; }
+
 http {
     resolver 127.0.0.11 valid=10s ipv6=off;
 
-    map $http_upgrade $connection_upgrade {
+    map \$$http_upgrade \$$connection_upgrade {
         default upgrade;
-        '' close;
+        ''      close;
     }
 
     upstream backends {
@@ -51,35 +52,35 @@ http {
         server_name _;
 
         location / {
-            set $frontend http://frontend:3000;
-            proxy_pass $frontend;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
+            set \$$frontend http://frontend:3000;
+            proxy_pass \$$frontend;
+            proxy_set_header Host \$$host;
+            proxy_set_header X-Real-IP \$$remote_addr;
         }
 
         location /api/ {
             proxy_pass http://backends;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header Host \$$host;
+            proxy_set_header X-Real-IP \$$remote_addr;
         }
 
         location /health {
             proxy_pass http://backends;
-            proxy_set_header Host $host;
+            proxy_set_header Host \$$host;
         }
 
         location /metrics {
-            set $backend http://backend1:8000;
-            proxy_pass $backend;
+            set \$$backend http://backend1:8000;
+            proxy_pass \$$backend;
         }
 
         location /ws/ {
             proxy_pass http://backends;
             proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection $connection_upgrade;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header Upgrade \$$http_upgrade;
+            proxy_set_header Connection \$$connection_upgrade;
+            proxy_set_header Host \$$host;
+            proxy_set_header X-Real-IP \$$remote_addr;
             proxy_read_timeout 86400;
             proxy_send_timeout 86400;
         }
@@ -103,12 +104,10 @@ services:
 
   backend1:
     build: ./backend
+    env_file: .env
     environment:
       - INSTANCE_ID=backend1
       - SERVER_ROLE=app-server
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - DATABASE_URL=${DATABASE_URL:-postgresql://quizuser:quizpass@postgres:5432/quizdb}
-      - LAMBDA_URL=${LAMBDA_URL:-http://localhost:9000}
     ports: ["8000:8000"]
     networks: [quiznet]
     restart: unless-stopped
@@ -116,8 +115,6 @@ services:
 
   frontend:
     build: ./frontend
-    environment:
-      - NEXT_PUBLIC_WS_URL=ws://PLACEHOLDER:80/ws
     ports: ["3000:3000"]
     depends_on: [backend1]
     networks: [quiznet]
