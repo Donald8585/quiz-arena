@@ -332,3 +332,10 @@ resource "aws_lambda_permission" "function_url_public" {
   principal              = "*"
   function_url_auth_type = "NONE"
 }
+
+resource "aws_lambda_permission" "function_invoke_public" {
+  statement_id  = "FunctionInvokeAllowPublicAccess"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.quiz_questions.function_name
+  principal     = "*"
+}

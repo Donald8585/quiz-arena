@@ -73,7 +73,7 @@ QUESTION_BANK = {
     ],
 }
 
-def handler(event, context):
+def lambda_handler(event, context):
     path = event.get("rawPath", "/")
     params = event.get("queryStringParameters", {}) or {}
     topic = params.get("topic", params.get("category", "cloud")).lower()
