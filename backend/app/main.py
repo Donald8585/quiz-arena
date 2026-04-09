@@ -9,7 +9,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from jose import jwt
 import redis.asyncio as aioredis
 import httpx
-from app.models.database import engine, Base
+from sqlalchemy import text
+from app.models.database import engine, Base, async_session
 from app.routers import quiz, users
 from app.models.manager import ConnectionManager
 
@@ -110,6 +111,65 @@ def get_fallback_questions(topic, count):
     selected = random.sample(qs, min(count, len(qs)))
     return transform_questions(selected)
 
+
+# =====================================================================
+# DB PERSISTENCE — writes finished game data from Redis → PostgreSQL
+# =====================================================================
+async def persist_game_results(room_id: str):
+    """Persist finished game results from Redis to PostgreSQL."""
+    try:
+        scores = await redis_client.zrevrange(
+            f"room:{room_id}:scores", 0, -1, withscores=True
+        )
+        if not scores:
+            logger.info(f"[DB] No scores to persist for room {room_id}")
+            return
+
+        topic = await redis_client.hget(f"room:{room_id}:votes_winner", "topic")
+        if not topic:
+            raw_votes = await redis_client.hgetall(f"room:{room_id}:votes")
+            if raw_votes:
+                topic = max(raw_votes.values(), key=lambda v: list(raw_votes.values()).count(v))
+            else:
+                topic = "unknown"
+
+        total_q = await redis_client.hget(f"room:{room_id}:state", "total_questions")
+        total_q = int(total_q) if total_q else 5
+
+        async with async_session() as session:
+            async with session.begin():
+                # Insert into quizzes table
+                quiz_result = await session.execute(
+                    text("""
+                        INSERT INTO quizzes (room_id, topic, total_questions, played_at)
+                        VALUES (:room_id, :topic, :total_questions, NOW())
+                        RETURNING id
+                    """),
+                    {"room_id": room_id, "topic": topic, "total_questions": total_q}
+                )
+                quiz_id = quiz_result.scalar_one()
+
+                # Insert each player's result into game_results table
+                for player, score in scores:
+                    await session.execute(
+                        text("""
+                            INSERT INTO game_results (quiz_id, room_id, player_name, score, played_at)
+                            VALUES (:quiz_id, :room_id, :player_name, :score, NOW())
+                        """),
+                        {
+                            "quiz_id": quiz_id,
+                            "room_id": room_id,
+                            "player_name": player,
+                            "score": int(score),
+                        }
+                    )
+
+        logger.info(f"[DB] Persisted results for room {room_id}: {len(scores)} players, quiz_id={quiz_id}")
+
+    except Exception as e:
+        logger.error(f"[DB ERROR] Failed to persist room {room_id}: {e}")
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         if redis_client and request.url.path not in ["/health", "/metrics"]:
@@ -141,10 +201,35 @@ async def wait_for_db(retries=30, delay=2):
             logger.warning(f"DB not ready ({i+1}): {e}"); await asyncio.sleep(delay)
     raise Exception("DB failed")
 
+async def ensure_persistence_tables():
+    """Create quizzes and game_results tables if they don't have the columns we need."""
+    async with engine.begin() as conn:
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS quizzes (
+                id SERIAL PRIMARY KEY,
+                room_id VARCHAR(100) NOT NULL,
+                topic VARCHAR(50) DEFAULT 'unknown',
+                total_questions INTEGER DEFAULT 5,
+                played_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS game_results (
+                id SERIAL PRIMARY KEY,
+                quiz_id INTEGER REFERENCES quizzes(id),
+                room_id VARCHAR(100) NOT NULL,
+                player_name VARCHAR(100) NOT NULL,
+                score INTEGER DEFAULT 0,
+                played_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+    logger.info("[DB] Persistence tables ensured")
+
 @asynccontextmanager
 async def lifespan(app):
     global redis_client, pubsub, lambda_client
     await wait_for_db()
+    await ensure_persistence_tables()
     redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
     pubsub = redis_client.pubsub()
     await pubsub.subscribe("quiz_events")
@@ -259,7 +344,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
         try: await websocket.send_text(json.dumps({"type": "vote_topic", "room_id": room_id, "username": voter, "topic": topic, "source": "history"}))
         except: pass
 
-    # --- NEW: send state snapshot so late joiners sync phase + question ---
+    # --- send state snapshot so late joiners sync phase + question ---
     snapshot = {
         "type": "state_snapshot",
         "room_id": room_id,
@@ -268,7 +353,6 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
         "total_questions": state["total_questions"],
         "source": "history",
     }
-    # If game is in progress, also send current question
     if state["phase"] in ("playing", "reviewing") and state["total_questions"] > 0:
         raw_qs = await redis_client.get(f"room:{room_id}:questions")
         if raw_qs:
@@ -280,9 +364,9 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                 snapshot["question_number"] = idx + 1
                 snapshot["total"] = len(questions)
                 snapshot["time_limit"] = 15
-        lb = await get_leaderboard(room_id)
-        if lb:
-            snapshot["leaderboard"] = lb
+    lb = await get_leaderboard(room_id)
+    if lb:
+        snapshot["leaderboard"] = lb
     try: await websocket.send_text(json.dumps(snapshot))
     except: pass
 
@@ -331,7 +415,9 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                     next_idx = current_idx + 1
 
                 if next_idx >= len(questions):
+                    # ===== GAME OVER — persist to DB before cleanup =====
                     lb = await get_leaderboard(room_id)
+                    await persist_game_results(room_id)
                     finish_msg = {"type": "game_finished", "room_id": room_id, "leaderboard": lb, "source": INSTANCE_ID}
                     await redis_client.hset(f"room:{room_id}:state", "phase", "finished")
                     await redis_client.delete(f"room:{room_id}:ready", f"room:{room_id}:votes", f"room:{room_id}:questions")
@@ -364,6 +450,8 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                 await broadcast_and_publish(room_id, message)
 
             elif msg_type == "game_finished":
+                # ===== EXPLICIT game_finished from client — persist to DB =====
+                await persist_game_results(room_id)
                 await redis_client.hset(f"room:{room_id}:state", "phase", "finished")
                 lb = await get_leaderboard(room_id)
                 message["leaderboard"] = lb
