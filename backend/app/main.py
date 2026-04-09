@@ -188,6 +188,17 @@ async def lifespan(app):
         logger.warning(f"boto3 Lambda client failed: {e}")
         lambda_client = None
     logger.info("Started!"); yield
+        # Initialize metrics so Prometheus shows them even before first request
+    REQUEST_COUNT.labels(method="GET", endpoint="/api/quiz", instance=INSTANCE_ID, status="200")
+    REQUEST_LATENCY.labels(endpoint="/api/quiz", instance=INSTANCE_ID)
+    WS_CONNECTIONS.labels(instance=INSTANCE_ID)
+    WS_ACTIVE.labels(instance=INSTANCE_ID).set(0)
+    QUIZ_ANSWERS.labels(instance=INSTANCE_ID, correct="True")
+    QUIZ_ANSWERS.labels(instance=INSTANCE_ID, correct="False")
+    LAMBDA_CALLS.labels(instance=INSTANCE_ID, status="success")
+    LAMBDA_CALLS.labels(instance=INSTANCE_ID, status="error")
+    LAMBDA_LATENCY.labels(instance=INSTANCE_ID)
+    GAME_ROOMS.labels(instance=INSTANCE_ID).set(0)
     await pubsub.unsubscribe("quiz_events"); await redis_client.close(); await engine.dispose()
 
 async def redis_listener():
