@@ -160,14 +160,14 @@ cat > monitoring/dashboards/quiz-arena.json << 'JSONEOF'
       "title": "Request Rate (per second)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
-      "targets": [{ "expr": "sum(rate(http_requests_total[1m])) by (instance)", "legendFormat": "{{instance}}" }],
+      "targets": [{ "expr": "sum(rate(quiz_requests_total[1m])) by (instance)", "legendFormat": "{{instance}}" }],
       "datasource": "Prometheus"
     },
     {
       "title": "Request Duration (p95)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-      "targets": [{ "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))", "legendFormat": "p95" }],
+      "targets": [{ "expr": "histogram_quantile(0.95, rate(request_latency_seconds_bucket[5m]))", "legendFormat": "p95" }],
       "datasource": "Prometheus"
     },
     {
@@ -188,14 +188,14 @@ cat > monitoring/dashboards/quiz-arena.json << 'JSONEOF'
       "title": "Active WebSocket Connections",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
-      "targets": [{ "expr": "sum(websocket_connections_active)", "legendFormat": "connections" }],
+      "targets": [{ "expr": "sum(ws_active_connections)", "legendFormat": "connections" }],
       "datasource": "Prometheus"
     },
     {
       "title": "Active Game Rooms",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
-      "targets": [{ "expr": "sum(game_rooms_active)", "legendFormat": "rooms" }],
+      "targets": [{ "expr": "sum(quiz_answers_total)", "legendFormat": "rooms" }],
       "datasource": "Prometheus"
     },
     {
