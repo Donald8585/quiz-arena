@@ -324,3 +324,11 @@ resource "aws_eip" "worker_eip" {
   tags              = { Name = "quiz-arena-worker-eip" }
   depends_on        = [aws_instance.worker_server]
 }
+
+resource "aws_lambda_permission" "function_url_public" {
+  statement_id           = "FunctionURLAllowPublicAccess"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.quiz_questions.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}
