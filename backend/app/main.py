@@ -29,6 +29,7 @@ QUIZ_ANSWERS = Counter("quiz_answers_total", "Answers", ["instance", "correct"])
 REQUEST_LATENCY = Histogram("request_latency_seconds", "Latency", ["endpoint", "instance"])
 LAMBDA_CALLS = Counter("lambda_calls_total", "Lambda", ["instance", "status"])
 LAMBDA_LATENCY = Histogram("lambda_latency_seconds", "Lambda latency", ["instance"])
+GAME_ROOMS = Gauge("game_rooms_active", "Active game rooms", ["instance"])
 
 redis_client = None
 manager = ConnectionManager()
@@ -344,6 +345,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                 await broadcast_and_publish(room_id, message)
 
             elif msg_type == "game_start":
+                GAME_ROOMS.labels(instance=INSTANCE_ID).inc()
                 await redis_client.hset(f"room:{room_id}:state", mapping={
                     "phase": "playing", "question_idx": "0",
                     "total_questions": str(message.get("total_questions", 5)),
@@ -368,6 +370,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
 
                 if next_idx >= len(questions):
                     # ===== GAME OVER — persist to DB before cleanup =====
+                    GAME_ROOMS.labels(instance=INSTANCE_ID).dec()
                     lb = await get_leaderboard(room_id)
                     await persist_game_results(room_id)
                     finish_msg = {
@@ -416,6 +419,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
 
             elif msg_type == "game_finished":
                 # ===== EXPLICIT game_finished — persist to DB =====
+                GAME_ROOMS.labels(instance=INSTANCE_ID).dec()
                 await persist_game_results(room_id)
                 await redis_client.hset(f"room:{room_id}:state", "phase", "finished")
                 lb = await get_leaderboard(room_id)

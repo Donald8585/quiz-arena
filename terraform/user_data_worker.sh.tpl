@@ -80,7 +80,7 @@ DCEOF
 
 mkdir -p monitoring/dashboards
 
-# ── Prometheus config (PROPERLY INDENTED YAML) ──
+# ── Prometheus config ──
 cat > monitoring/prometheus.yml << 'PROMEOF'
 global:
   scrape_interval: 15s
@@ -138,7 +138,7 @@ providers:
       foldersFromFilesStructure: false
 DBEOF
 
-# ── Pre-built Quiz Arena dashboard ──
+# ── Pre-built Quiz Arena dashboard (CORRECT metric names) ──
 cat > monitoring/dashboards/quiz-arena.json << 'JSONEOF'
 {
   "annotations": { "list": [] },
@@ -154,6 +154,27 @@ cat > monitoring/dashboards/quiz-arena.json << 'JSONEOF'
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "targets": [{ "expr": "count(up{job=~\"backend.*\"} == 1)", "legendFormat": "instances" }],
       "fieldConfig": { "defaults": { "thresholds": { "steps": [{"color":"red","value":null},{"color":"green","value":2}] } } },
+      "datasource": "Prometheus"
+    },
+    {
+      "title": "Active WebSocket Connections",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [{ "expr": "sum(ws_active_connections)", "legendFormat": "connections" }],
+      "datasource": "Prometheus"
+    },
+    {
+      "title": "Active Game Rooms",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [{ "expr": "sum(game_rooms_active)", "legendFormat": "rooms" }],
+      "datasource": "Prometheus"
+    },
+    {
+      "title": "Lambda Calls",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [{ "expr": "sum(lambda_calls_total)", "legendFormat": "calls" }],
       "datasource": "Prometheus"
     },
     {
@@ -185,23 +206,23 @@ cat > monitoring/dashboards/quiz-arena.json << 'JSONEOF'
       "datasource": "Prometheus"
     },
     {
-      "title": "Active WebSocket Connections",
-      "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
-      "targets": [{ "expr": "sum(ws_active_connections)", "legendFormat": "connections" }],
+      "title": "WebSocket Connections Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "targets": [{ "expr": "ws_active_connections", "legendFormat": "{{instance}}" }],
       "datasource": "Prometheus"
     },
     {
-      "title": "Active Game Rooms",
-      "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
-      "targets": [{ "expr": "sum(quiz_answers_total)", "legendFormat": "rooms" }],
+      "title": "Lambda Latency (seconds)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "targets": [{ "expr": "histogram_quantile(0.95, rate(lambda_latency_seconds_bucket[5m]))", "legendFormat": "p95" }],
       "datasource": "Prometheus"
     },
     {
       "title": "Network I/O (bytes/sec)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
       "targets": [
         { "expr": "rate(node_network_receive_bytes_total{device!=\"lo\"}[5m])", "legendFormat": "{{job}} rx" },
         { "expr": "rate(node_network_transmit_bytes_total{device!=\"lo\"}[5m])", "legendFormat": "{{job}} tx" }
