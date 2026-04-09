@@ -9,7 +9,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from jose import jwt
 import redis.asyncio as aioredis
 import httpx
-from app.models.database import engine, Base, async_session, GameResult
+from sqlalchemy import text
+from app.models.database import engine, Base, async_session
 from app.routers import quiz, users
 from app.models.manager import ConnectionManager
 
@@ -87,8 +88,10 @@ FALLBACK_QUESTIONS = {
     ],
 }
 
+
 def create_token(username):
     return jwt.encode({"sub": username, "exp": datetime.utcnow() + timedelta(hours=24)}, JWT_SECRET, algorithm="HS256")
+
 
 def transform_questions(raw_questions):
     letters = ["A", "B", "C", "D"]
@@ -106,6 +109,7 @@ def transform_questions(raw_questions):
         })
     return mapped
 
+
 def get_fallback_questions(topic, count):
     qs = FALLBACK_QUESTIONS.get(topic, FALLBACK_QUESTIONS["cloud"])
     selected = random.sample(qs, min(count, len(qs)))
@@ -114,7 +118,6 @@ def get_fallback_questions(topic, count):
 
 # =====================================================================
 # DB PERSISTENCE — writes finished game data from Redis → PostgreSQL
-# Uses the GameResult ORM model from database.py
 # =====================================================================
 async def persist_game_results(room_id: str):
     """Persist finished game results from Redis to PostgreSQL."""
@@ -129,12 +132,17 @@ async def persist_game_results(room_id: str):
         async with async_session() as session:
             async with session.begin():
                 for player, score in scores:
-                    session.add(GameResult(
-                        room_id=room_id,
-                        username=player,
-                        score=int(score),
-                    ))
-
+                    await session.execute(
+                        text("""
+                            INSERT INTO game_results (room_id, username, score, played_at)
+                            VALUES (:room_id, :username, :score, NOW())
+                        """),
+                        {
+                            "room_id": room_id,
+                            "username": player,
+                            "score": int(score),
+                        }
+                    )
         logger.info(f"[DB] Persisted results for room {room_id}: {len(scores)} players")
 
     except Exception as e:
@@ -153,6 +161,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             except Exception: pass
         return await call_next(request)
 
+
 class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         start = time.time()
@@ -161,6 +170,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             REQUEST_COUNT.labels(method=request.method, endpoint=request.url.path, instance=INSTANCE_ID, status=response.status_code).inc()
             REQUEST_LATENCY.labels(endpoint=request.url.path, instance=INSTANCE_ID).observe(time.time() - start)
         return response
+
 
 async def wait_for_db(retries=30, delay=2):
     for i in range(retries):
@@ -171,6 +181,7 @@ async def wait_for_db(retries=30, delay=2):
         except Exception as e:
             logger.warning(f"DB not ready ({i+1}): {e}"); await asyncio.sleep(delay)
     raise Exception("DB failed")
+
 
 @asynccontextmanager
 async def lifespan(app):
@@ -187,8 +198,7 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"boto3 Lambda client failed: {e}")
         lambda_client = None
-    logger.info("Started!"); yield
-        # Initialize metrics so Prometheus shows them even before first request
+    # Pre-initialize metrics so Prometheus shows them immediately
     REQUEST_COUNT.labels(method="GET", endpoint="/api/quiz", instance=INSTANCE_ID, status="200")
     REQUEST_LATENCY.labels(endpoint="/api/quiz", instance=INSTANCE_ID)
     WS_CONNECTIONS.labels(instance=INSTANCE_ID)
@@ -199,7 +209,9 @@ async def lifespan(app):
     LAMBDA_CALLS.labels(instance=INSTANCE_ID, status="error")
     LAMBDA_LATENCY.labels(instance=INSTANCE_ID)
     GAME_ROOMS.labels(instance=INSTANCE_ID).set(0)
+    logger.info("Started!"); yield
     await pubsub.unsubscribe("quiz_events"); await redis_client.close(); await engine.dispose()
+
 
 async def redis_listener():
     while True:
@@ -214,6 +226,7 @@ async def redis_listener():
         except Exception as e:
             logger.error(f"Redis listener: {e}"); await asyncio.sleep(1)
 
+
 app = FastAPI(title="Quiz Arena API", lifespan=lifespan)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(LoggingMiddleware)
@@ -221,10 +234,14 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 app.include_router(quiz.router, prefix="/api/quiz", tags=["quiz"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 
+
 @app.get("/health")
 async def health(): return {"status": "ok", "instance": INSTANCE_ID}
+
+
 @app.get("/metrics")
 async def metrics(): return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 
 @app.get("/api/generate-questions")
 async def generate_questions(topic: str = "cloud", count: int = 5):
@@ -262,27 +279,26 @@ async def generate_questions(topic: str = "cloud", count: int = 5):
         LAMBDA_CALLS.labels(instance=INSTANCE_ID, status="error").inc()
         return {"questions": get_fallback_questions(topic, count), "category": topic, "source": "fallback-error"}
 
+
 async def get_room_state(room_id):
     state = await redis_client.hgetall(f"room:{room_id}:state")
     players = list(await redis_client.smembers(f"room:{room_id}:players"))
     ready = list(await redis_client.smembers(f"room:{room_id}:ready"))
     votes_raw = await redis_client.hgetall(f"room:{room_id}:votes")
-    return {
-        "players": players, "ready": ready, "votes": votes_raw,
-        "phase": state.get("phase", "lobby"),
-        "question_idx": int(state.get("question_idx", "0")),
-        "total_questions": int(state.get("total_questions", "0")),
-    }
+    return {"players": players, "ready": ready, "votes": votes_raw, "phase": state.get("phase", "lobby"), "question_idx": int(state.get("question_idx", "0")), "total_questions": int(state.get("total_questions", "0"))}
+
 
 async def get_leaderboard(room_id):
     score_key = f"room:{room_id}:scores"
     lb = await redis_client.zrevrange(score_key, 0, -1, withscores=True)
     return [{"username": u, "score": int(s)} for u, s in lb]
 
+
 async def broadcast_and_publish(room_id, msg_dict):
     raw = json.dumps(msg_dict)
     await redis_client.publish("quiz_events", raw)
     await manager.broadcast_to_room(room_id, raw)
+
 
 @app.websocket("/ws/{room_id}/{username}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
@@ -357,17 +373,13 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
 
             elif msg_type == "game_start":
                 GAME_ROOMS.labels(instance=INSTANCE_ID).inc()
-                await redis_client.hset(f"room:{room_id}:state", mapping={
-                    "phase": "playing", "question_idx": "0",
-                    "total_questions": str(message.get("total_questions", 5)),
-                })
+                await redis_client.hset(f"room:{room_id}:state", mapping={"phase": "playing", "question_idx": "0", "total_questions": str(message.get("total_questions", 5))})
                 if message.get("questions"):
                     await redis_client.set(f"room:{room_id}:questions", json.dumps(message["questions"]), ex=3600)
                 await redis_client.delete(f"room:{room_id}:scores")
                 await broadcast_and_publish(room_id, message)
 
             elif msg_type == "new_question":
-                # SERVER-AUTHORITATIVE: read next question from Redis
                 raw_qs = await redis_client.get(f"room:{room_id}:questions")
                 if not raw_qs:
                     continue
@@ -384,36 +396,23 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                     GAME_ROOMS.labels(instance=INSTANCE_ID).dec()
                     lb = await get_leaderboard(room_id)
                     await persist_game_results(room_id)
-                    finish_msg = {
-                        "type": "game_finished", "room_id": room_id,
-                        "leaderboard": lb, "source": INSTANCE_ID,
-                    }
+                    finish_msg = {"type": "game_finished", "room_id": room_id, "leaderboard": lb, "source": INSTANCE_ID}
                     await redis_client.hset(f"room:{room_id}:state", "phase", "finished")
-                    await redis_client.delete(
-                        f"room:{room_id}:ready",
-                        f"room:{room_id}:votes",
-                        f"room:{room_id}:questions",
-                    )
+                    await redis_client.delete(f"room:{room_id}:ready", f"room:{room_id}:votes", f"room:{room_id}:questions")
                     await broadcast_and_publish(room_id, finish_msg)
                     continue
 
-                await redis_client.hset(f"room:{room_id}:state", mapping={
-                    "question_idx": str(next_idx), "phase": "playing",
-                })
+                await redis_client.hset(f"room:{room_id}:state", mapping={"question_idx": str(next_idx), "phase": "playing"})
                 await redis_client.delete(f"room:{room_id}:answered")
                 q = questions[next_idx]
                 out = {
                     "type": "new_question", "room_id": room_id,
                     "question_text": q.get("question_text", ""),
-                    "option_a": q.get("option_a", ""),
-                    "option_b": q.get("option_b", ""),
-                    "option_c": q.get("option_c", ""),
-                    "option_d": q.get("option_d", ""),
+                    "option_a": q.get("option_a", ""), "option_b": q.get("option_b", ""),
+                    "option_c": q.get("option_c", ""), "option_d": q.get("option_d", ""),
                     "correct_answer": q.get("correct_answer", "A"),
-                    "question_number": next_idx + 1,
-                    "total": len(questions),
-                    "time_limit": 15,
-                    "source": INSTANCE_ID,
+                    "question_number": next_idx + 1, "total": len(questions),
+                    "time_limit": 15, "source": INSTANCE_ID,
                 }
                 await broadcast_and_publish(room_id, out)
 
@@ -429,17 +428,12 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                 await broadcast_and_publish(room_id, message)
 
             elif msg_type == "game_finished":
-                # ===== EXPLICIT game_finished — persist to DB =====
                 GAME_ROOMS.labels(instance=INSTANCE_ID).dec()
                 await persist_game_results(room_id)
                 await redis_client.hset(f"room:{room_id}:state", "phase", "finished")
                 lb = await get_leaderboard(room_id)
                 message["leaderboard"] = lb
-                await redis_client.delete(
-                    f"room:{room_id}:ready",
-                    f"room:{room_id}:votes",
-                    f"room:{room_id}:questions",
-                )
+                await redis_client.delete(f"room:{room_id}:ready", f"room:{room_id}:votes", f"room:{room_id}:questions")
                 await broadcast_and_publish(room_id, message)
 
             elif msg_type == "answer":
@@ -452,14 +446,8 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                 await broadcast_and_publish(room_id, message)
 
             elif msg_type == "back_to_lobby":
-                await redis_client.hset(f"room:{room_id}:state", mapping={
-                    "phase": "lobby", "question_idx": "0", "total_questions": "0",
-                })
-                await redis_client.delete(
-                    f"room:{room_id}:ready", f"room:{room_id}:votes",
-                    f"room:{room_id}:questions", f"room:{room_id}:scores",
-                    f"room:{room_id}:answered",
-                )
+                await redis_client.hset(f"room:{room_id}:state", mapping={"phase": "lobby", "question_idx": "0", "total_questions": "0"})
+                await redis_client.delete(f"room:{room_id}:ready", f"room:{room_id}:votes", f"room:{room_id}:questions", f"room:{room_id}:scores", f"room:{room_id}:answered")
                 await broadcast_and_publish(room_id, message)
 
             elif msg_type == "chat":
