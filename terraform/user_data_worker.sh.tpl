@@ -154,49 +154,49 @@ cat > monitoring/dashboards/quiz-arena.json << 'JSONEOF'
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "targets": [{ "expr": "count(up{job=~\"backend.*\"} == 1)", "legendFormat": "instances" }],
       "fieldConfig": { "defaults": { "thresholds": { "steps": [{"color":"red","value":null},{"color":"green","value":2}] } } },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+      "datasource": "Prometheus"
     },
     {
       "title": "Request Rate (per second)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "targets": [{ "expr": "sum(rate(http_requests_total[1m])) by (instance)", "legendFormat": "{{instance}}" }],
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+      "datasource": "Prometheus"
     },
     {
       "title": "Request Duration (p95)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "targets": [{ "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))", "legendFormat": "p95" }],
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+      "datasource": "Prometheus"
     },
     {
       "title": "CPU Usage %",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "targets": [{ "expr": "100 - (avg by(job) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "{{job}}" }],
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+      "datasource": "Prometheus"
     },
     {
       "title": "Memory Usage %",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
       "targets": [{ "expr": "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100", "legendFormat": "{{job}}" }],
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+      "datasource": "Prometheus"
     },
     {
       "title": "Active WebSocket Connections",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
       "targets": [{ "expr": "sum(websocket_connections_active)", "legendFormat": "connections" }],
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+      "datasource": "Prometheus"
     },
     {
       "title": "Active Game Rooms",
       "type": "stat",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
       "targets": [{ "expr": "sum(game_rooms_active)", "legendFormat": "rooms" }],
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+      "datasource": "Prometheus"
     },
     {
       "title": "Network I/O (bytes/sec)",
@@ -206,7 +206,7 @@ cat > monitoring/dashboards/quiz-arena.json << 'JSONEOF'
         { "expr": "rate(node_network_receive_bytes_total{device!=\"lo\"}[5m])", "legendFormat": "{{job}} rx" },
         { "expr": "rate(node_network_transmit_bytes_total{device!=\"lo\"}[5m])", "legendFormat": "{{job}} tx" }
       ],
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+      "datasource": "Prometheus"
     }
   ],
   "schemaVersion": 39,
