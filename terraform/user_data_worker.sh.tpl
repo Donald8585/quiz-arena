@@ -56,6 +56,10 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_SERVER_HTTP_PORT=3001
+    volumes:
+      - ./monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./monitoring/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./monitoring/dashboards:/var/lib/grafana/dashboards:ro
     ports: ["3001:3001"]
     depends_on: [prometheus]
     networks: [quiznet]
@@ -74,7 +78,9 @@ networks:
     driver: bridge
 DCEOF
 
-mkdir -p monitoring
+mkdir -p monitoring/dashboards
+
+# ── Prometheus config (PROPERLY INDENTED YAML) ──
 cat > monitoring/prometheus.yml << 'PROMEOF'
 global:
   scrape_interval: 15s
@@ -94,11 +100,6 @@ scrape_configs:
         labels:
           instance: "backend2"
 
-  - job_name: "nginx"
-    metrics_path: /metrics
-    static_configs:
-      - targets: ["APP_IP_PLACEHOLDER:80"]
-
   - job_name: "node-app"
     static_configs:
       - targets: ["APP_IP_PLACEHOLDER:9100"]
@@ -109,6 +110,113 @@ scrape_configs:
 PROMEOF
 
 sed -i "s/APP_IP_PLACEHOLDER/${app_private_ip}/g" monitoring/prometheus.yml
+
+# ── Grafana auto-provisioned datasource ──
+cat > monitoring/grafana-datasources.yml << 'DSEOF'
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+DSEOF
+
+# ── Grafana dashboard provisioning config ──
+cat > monitoring/grafana-dashboards.yml << 'DBEOF'
+apiVersion: 1
+providers:
+  - name: "default"
+    orgId: 1
+    folder: "Quiz Arena"
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
+DBEOF
+
+# ── Pre-built Quiz Arena dashboard ──
+cat > monitoring/dashboards/quiz-arena.json << 'JSONEOF'
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Backend Instances Up",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [{ "expr": "count(up{job=~\"backend.*\"} == 1)", "legendFormat": "instances" }],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{"color":"red","value":null},{"color":"green","value":2}] } } },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+    },
+    {
+      "title": "Request Rate (per second)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [{ "expr": "sum(rate(http_requests_total[1m])) by (instance)", "legendFormat": "{{instance}}" }],
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+    },
+    {
+      "title": "Request Duration (p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [{ "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))", "legendFormat": "p95" }],
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+    },
+    {
+      "title": "CPU Usage %",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [{ "expr": "100 - (avg by(job) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "{{job}}" }],
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+    },
+    {
+      "title": "Memory Usage %",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [{ "expr": "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100", "legendFormat": "{{job}}" }],
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+    },
+    {
+      "title": "Active WebSocket Connections",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [{ "expr": "sum(websocket_connections_active)", "legendFormat": "connections" }],
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+    },
+    {
+      "title": "Active Game Rooms",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [{ "expr": "sum(game_rooms_active)", "legendFormat": "rooms" }],
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+    },
+    {
+      "title": "Network I/O (bytes/sec)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "targets": [
+        { "expr": "rate(node_network_receive_bytes_total{device!=\"lo\"}[5m])", "legendFormat": "{{job}} rx" },
+        { "expr": "rate(node_network_transmit_bytes_total{device!=\"lo\"}[5m])", "legendFormat": "{{job}} tx" }
+      ],
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["quiz-arena"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Quiz Arena Overview",
+  "uid": "quiz-arena-overview"
+}
+JSONEOF
 
 docker compose -f docker-compose.server2.yml up -d --build
 

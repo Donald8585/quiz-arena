@@ -3,7 +3,7 @@ exec > /var/log/quiz-arena-deploy.log 2>&1
 set -ex
 
 dnf update -y
-dnf install -y docker git
+dnf install -y docker git postgresql15
 systemctl enable docker && systemctl start docker
 
 mkdir -p /usr/local/lib/docker/cli-plugins
@@ -38,7 +38,7 @@ http {
 
     map $http_upgrade $connection_upgrade {
         default upgrade;
-        ''      close;
+        '' close;
     }
 
     upstream backends {
