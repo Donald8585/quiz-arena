@@ -88,10 +88,8 @@ FALLBACK_QUESTIONS = {
     ],
 }
 
-
 def create_token(username):
     return jwt.encode({"sub": username, "exp": datetime.utcnow() + timedelta(hours=24)}, JWT_SECRET, algorithm="HS256")
-
 
 def transform_questions(raw_questions):
     letters = ["A", "B", "C", "D"]
@@ -109,7 +107,6 @@ def transform_questions(raw_questions):
         })
     return mapped
 
-
 def get_fallback_questions(topic, count):
     qs = FALLBACK_QUESTIONS.get(topic, FALLBACK_QUESTIONS["cloud"])
     selected = random.sample(qs, min(count, len(qs)))
@@ -117,8 +114,9 @@ def get_fallback_questions(topic, count):
 
 
 # =====================================================================
-# DB PERSISTENCE — writes finished game data from Redis → PostgreSQL
+# DB PERSISTENCE — writes game data from Redis -> PostgreSQL
 # =====================================================================
+
 async def persist_game_results(room_id: str):
     """Persist finished game results from Redis to PostgreSQL."""
     try:
@@ -149,6 +147,114 @@ async def persist_game_results(room_id: str):
         logger.error(f"[DB ERROR] Failed to persist room {room_id}: {e}")
 
 
+# =====================================================================
+# FIX #1: Upsert player into `users` table on WebSocket connect
+# =====================================================================
+
+async def persist_user(username: str):
+    """Upsert a user row into PostgreSQL when they join via WebSocket.
+    Uses a sentinel hashed_password so guest users can't login via REST,
+    but still exist in the DB for stats tracking."""
+    try:
+        async with async_session() as session:
+            async with session.begin():
+                await session.execute(
+                    text("""
+                        INSERT INTO users (username, hashed_password, created_at, total_score, games_played)
+                        VALUES (:username, :pwd, NOW(), 0, 0)
+                        ON CONFLICT (username) DO NOTHING
+                    """),
+                    {"username": username, "pwd": "GUEST_WS_USER"}
+                )
+        logger.info(f"[DB] Upserted user: {username}")
+    except Exception as e:
+        logger.error(f"[DB ERROR] Failed to upsert user {username}: {e}")
+
+
+# =====================================================================
+# FIX #2: Persist quiz + questions into `quizzes` and `questions` tables
+# =====================================================================
+
+async def persist_quiz_and_questions(room_id: str, topic: str, questions: list):
+    """Save the generated quiz and its questions to PostgreSQL."""
+    try:
+        if not questions:
+            logger.info(f"[DB] No questions to persist for room {room_id}")
+            return
+
+        async with async_session() as session:
+            async with session.begin():
+                result = await session.execute(
+                    text("""
+                        INSERT INTO quizzes (title, created_by, created_at, is_active)
+                        VALUES (:title, :created_by, NOW(), true)
+                        RETURNING id
+                    """),
+                    {"title": f"{topic} - Room {room_id}", "created_by": "system"}
+                )
+                quiz_id = result.scalar_one()
+
+                for q in questions:
+                    await session.execute(
+                        text("""
+                            INSERT INTO questions
+                                (quiz_id, question_text, option_a, option_b, option_c, option_d, correct_answer, time_limit)
+                            VALUES
+                                (:quiz_id, :qt, :oa, :ob, :oc, :od, :ca, :tl)
+                        """),
+                        {
+                            "quiz_id": quiz_id,
+                            "qt": q.get("question_text", ""),
+                            "oa": q.get("option_a", ""),
+                            "ob": q.get("option_b", ""),
+                            "oc": q.get("option_c", ""),
+                            "od": q.get("option_d", ""),
+                            "ca": q.get("correct_answer", "A"),
+                            "tl": q.get("time_limit", 15),
+                        }
+                    )
+
+                # Store quiz_id in Redis so we can reference it later
+                await redis_client.set(f"room:{room_id}:quiz_id", str(quiz_id), ex=3600)
+
+        logger.info(f"[DB] Persisted quiz '{topic}' (id={quiz_id}) with {len(questions)} questions for room {room_id}")
+    except Exception as e:
+        logger.error(f"[DB ERROR] Failed to persist quiz for room {room_id}: {e}")
+
+
+# =====================================================================
+# FIX #3: Update users.total_score and users.games_played on game end
+# =====================================================================
+
+async def update_user_stats(room_id: str):
+    """Increment total_score and games_played for each player after game ends."""
+    try:
+        scores = await redis_client.zrevrange(
+            f"room:{room_id}:scores", 0, -1, withscores=True
+        )
+        if not scores:
+            return
+
+        async with async_session() as session:
+            async with session.begin():
+                for player, score in scores:
+                    await session.execute(
+                        text("""
+                            UPDATE users
+                            SET total_score = total_score + :score,
+                                games_played = games_played + 1
+                            WHERE username = :username
+                        """),
+                        {"score": int(score), "username": player}
+                    )
+        logger.info(f"[DB] Updated user stats for room {room_id}: {len(scores)} players")
+    except Exception as e:
+        logger.error(f"[DB ERROR] Failed to update user stats for room {room_id}: {e}")
+
+
+# =====================================================================
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         if redis_client and request.url.path not in ["/health", "/metrics"]:
@@ -161,7 +267,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             except Exception: pass
         return await call_next(request)
 
-
 class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         start = time.time()
@@ -170,7 +275,6 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             REQUEST_COUNT.labels(method=request.method, endpoint=request.url.path, instance=INSTANCE_ID, status=response.status_code).inc()
             REQUEST_LATENCY.labels(endpoint=request.url.path, instance=INSTANCE_ID).observe(time.time() - start)
         return response
-
 
 async def wait_for_db(retries=30, delay=2):
     for i in range(retries):
@@ -181,7 +285,6 @@ async def wait_for_db(retries=30, delay=2):
         except Exception as e:
             logger.warning(f"DB not ready ({i+1}): {e}"); await asyncio.sleep(delay)
     raise Exception("DB failed")
-
 
 @asynccontextmanager
 async def lifespan(app):
@@ -198,7 +301,6 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"boto3 Lambda client failed: {e}")
         lambda_client = None
-    # Pre-initialize metrics so Prometheus shows them immediately
     REQUEST_COUNT.labels(method="GET", endpoint="/api/quiz", instance=INSTANCE_ID, status="200")
     REQUEST_LATENCY.labels(endpoint="/api/quiz", instance=INSTANCE_ID)
     WS_CONNECTIONS.labels(instance=INSTANCE_ID)
@@ -211,7 +313,6 @@ async def lifespan(app):
     GAME_ROOMS.labels(instance=INSTANCE_ID).set(0)
     logger.info("Started!"); yield
     await pubsub.unsubscribe("quiz_events"); await redis_client.close(); await engine.dispose()
-
 
 async def redis_listener():
     while True:
@@ -226,7 +327,6 @@ async def redis_listener():
         except Exception as e:
             logger.error(f"Redis listener: {e}"); await asyncio.sleep(1)
 
-
 app = FastAPI(title="Quiz Arena API", lifespan=lifespan)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(LoggingMiddleware)
@@ -234,14 +334,11 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 app.include_router(quiz.router, prefix="/api/quiz", tags=["quiz"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 
-
 @app.get("/health")
 async def health(): return {"status": "ok", "instance": INSTANCE_ID}
 
-
 @app.get("/metrics")
 async def metrics(): return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
-
 
 @app.get("/api/generate-questions")
 async def generate_questions(topic: str = "cloud", count: int = 5):
@@ -279,7 +376,6 @@ async def generate_questions(topic: str = "cloud", count: int = 5):
         LAMBDA_CALLS.labels(instance=INSTANCE_ID, status="error").inc()
         return {"questions": get_fallback_questions(topic, count), "category": topic, "source": "fallback-error"}
 
-
 async def get_room_state(room_id):
     state = await redis_client.hgetall(f"room:{room_id}:state")
     players = list(await redis_client.smembers(f"room:{room_id}:players"))
@@ -287,12 +383,10 @@ async def get_room_state(room_id):
     votes_raw = await redis_client.hgetall(f"room:{room_id}:votes")
     return {"players": players, "ready": ready, "votes": votes_raw, "phase": state.get("phase", "lobby"), "question_idx": int(state.get("question_idx", "0")), "total_questions": int(state.get("total_questions", "0"))}
 
-
 async def get_leaderboard(room_id):
     score_key = f"room:{room_id}:scores"
     lb = await redis_client.zrevrange(score_key, 0, -1, withscores=True)
     return [{"username": u, "score": int(s)} for u, s in lb]
-
 
 async def broadcast_and_publish(room_id, msg_dict):
     raw = json.dumps(msg_dict)
@@ -308,6 +402,9 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
 
     await redis_client.sadd(f"room:{room_id}:players", username)
     await redis_client.expire(f"room:{room_id}:players", 3600)
+
+    # FIX #1: Upsert user into PostgreSQL on connect
+    asyncio.create_task(persist_user(username))
 
     # --- replay history to this client only ---
     state = await get_room_state(room_id)
@@ -377,6 +474,14 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                 if message.get("questions"):
                     await redis_client.set(f"room:{room_id}:questions", json.dumps(message["questions"]), ex=3600)
                 await redis_client.delete(f"room:{room_id}:scores")
+
+                # FIX #2: Persist quiz + questions to PostgreSQL
+                asyncio.create_task(persist_quiz_and_questions(
+                    room_id,
+                    message.get("topic", "cloud"),
+                    message.get("questions", [])
+                ))
+
                 await broadcast_and_publish(room_id, message)
 
             elif msg_type == "new_question":
@@ -395,7 +500,11 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
                     # ===== GAME OVER — persist to DB before cleanup =====
                     GAME_ROOMS.labels(instance=INSTANCE_ID).dec()
                     lb = await get_leaderboard(room_id)
+
+                    # FIX #3: Update user stats BEFORE persisting results
+                    await update_user_stats(room_id)
                     await persist_game_results(room_id)
+
                     finish_msg = {"type": "game_finished", "room_id": room_id, "leaderboard": lb, "source": INSTANCE_ID}
                     await redis_client.hset(f"room:{room_id}:state", "phase", "finished")
                     await redis_client.delete(f"room:{room_id}:ready", f"room:{room_id}:votes", f"room:{room_id}:questions")
@@ -429,7 +538,11 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, username: str):
 
             elif msg_type == "game_finished":
                 GAME_ROOMS.labels(instance=INSTANCE_ID).dec()
+
+                # FIX #3: Update user stats BEFORE persisting results
+                await update_user_stats(room_id)
                 await persist_game_results(room_id)
+
                 await redis_client.hset(f"room:{room_id}:state", "phase", "finished")
                 lb = await get_leaderboard(room_id)
                 message["leaderboard"] = lb
