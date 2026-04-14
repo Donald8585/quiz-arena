@@ -178,7 +178,7 @@ key_name    = "your-key-pair-name"    # AWS key pair for SSH
 my_ip       = "YOUR.IP.HERE/32"       # Your IP for security groups
 github_repo = "Donald8585/quiz-arena"
 db_username = "quizuser"
-db_password = "YourSecurePassword123!"
+db_password = "QuizArena2026!"
 ```
 
 > **Tip:** Find your public IP with `curl ifconfig.me`, then append `/32`.
