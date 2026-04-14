@@ -1,0 +1,1574 @@
+{
+  "version": 4,
+  "terraform_version": "1.14.6",
+  "serial": 551,
+  "lineage": "add3b5d7-7d19-0252-d263-f49076e5be5c",
+  "outputs": {
+    "api_url": {
+      "value": "http://52.86.98.150/api/",
+      "type": "string"
+    },
+    "app_server_public_ip": {
+      "value": "52.86.98.150",
+      "type": "string"
+    },
+    "frontend_url": {
+      "value": "http://52.86.98.150",
+      "type": "string"
+    },
+    "grafana_url": {
+      "value": "http://100.49.119.89:3001",
+      "type": "string"
+    },
+    "lambda_url": {
+      "value": "https://rivsjmc4lkgu57uuselzraosiq0rujbp.lambda-url.us-east-1.on.aws/",
+      "type": "string"
+    },
+    "prometheus_url": {
+      "value": "http://100.49.119.89:9090",
+      "type": "string"
+    },
+    "rds_endpoint": {
+      "value": "quiz-arena-db.c4tgessoku2a.us-east-1.rds.amazonaws.com:5432",
+      "type": "string"
+    },
+    "redis_endpoint": {
+      "value": "quiz-arena-redis.ez9wgr.0001.use1.cache.amazonaws.com",
+      "type": "string"
+    },
+    "ssh_app_server": {
+      "value": "ssh -i ~/.ssh/quiz-arena-key.pem ec2-user@52.86.98.150",
+      "type": "string"
+    },
+    "ssh_worker_server": {
+      "value": "ssh -i ~/.ssh/quiz-arena-key.pem ec2-user@100.49.119.89",
+      "type": "string"
+    },
+    "worker_server_public_ip": {
+      "value": "100.49.119.89",
+      "type": "string"
+    }
+  },
+  "resources": [
+    {
+      "mode": "data",
+      "type": "archive_file",
+      "name": "lambda_zip",
+      "provider": "provider[\"registry.terraform.io/hashicorp/archive\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "exclude_symlink_directories": null,
+            "excludes": null,
+            "id": "24fe5b9fe3f168df6afe794e10d78094f492a775",
+            "output_base64sha256": "oM7+HHHsqWZRfAR0oryH9MjLPE1+m3kf0q10Vq9jZ80=",
+            "output_base64sha512": "S7CeJ8vQAC/dQ3GSKQZO8/c2m2RwtKuMmo0voTBiYU5vWqdDUcWenrU5rC8g/EKdqrWGaAqCSPr1iw27ojvCgw==",
+            "output_file_mode": null,
+            "output_md5": "f24be2ddcd2ce40e479fdfcc676b7f22",
+            "output_path": "./lambda.zip",
+            "output_sha": "24fe5b9fe3f168df6afe794e10d78094f492a775",
+            "output_sha256": "a0cefe1c71eca966517c0474a2bc87f4c8cb3c4d7e9b791fd2ad7456af6367cd",
+            "output_sha512": "4bb09e27cbd0002fdd43719229064ef3f7369b6470b4ab8c9a8d2fa13062614e6f5aa74351c59e9eb539ac2f20fc429daab586680a8248faf58b0dbba23bc283",
+            "output_size": 12140,
+            "source": [],
+            "source_content": null,
+            "source_content_filename": null,
+            "source_dir": "./../lambda-function",
+            "source_file": null,
+            "type": "zip"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0
+        }
+      ]
+    },
+    {
+      "mode": "data",
+      "type": "aws_availability_zones",
+      "name": "available",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "all_availability_zones": null,
+            "exclude_names": null,
+            "exclude_zone_ids": null,
+            "filter": null,
+            "group_names": [
+              "us-east-1-zg-1"
+            ],
+            "id": "us-east-1",
+            "names": [
+              "us-east-1a",
+              "us-east-1b",
+              "us-east-1c",
+              "us-east-1d",
+              "us-east-1e",
+              "us-east-1f"
+            ],
+            "state": "available",
+            "timeouts": null,
+            "zone_ids": [
+              "use1-az1",
+              "use1-az2",
+              "use1-az4",
+              "use1-az6",
+              "use1-az3",
+              "use1-az5"
+            ]
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0
+        }
+      ]
+    },
+    {
+      "mode": "data",
+      "type": "aws_subnets",
+      "name": "default",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "filter": [
+              {
+                "name": "vpc-id",
+                "values": [
+                  "vpc-0b60a109be6d2fdd4"
+                ]
+              }
+            ],
+            "id": "us-east-1",
+            "ids": [
+              "subnet-0b975deaf2349495f",
+              "subnet-0fca693cc4a240381",
+              "subnet-096ca0a47cb2b2f83",
+              "subnet-0bdafa2771e4c920d",
+              "subnet-076213a4a3814fc83",
+              "subnet-0146576f793f9b6a3"
+            ],
+            "tags": null,
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0
+        }
+      ]
+    },
+    {
+      "mode": "data",
+      "type": "aws_vpc",
+      "name": "default",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "arn": "arn:aws:ec2:us-east-1:888577025156:vpc/vpc-0b60a109be6d2fdd4",
+            "cidr_block": "172.31.0.0/16",
+            "cidr_block_associations": [
+              {
+                "association_id": "vpc-cidr-assoc-0a95d4735898d516e",
+                "cidr_block": "172.31.0.0/16",
+                "state": "associated"
+              }
+            ],
+            "default": true,
+            "dhcp_options_id": "dopt-0b063ee311d4f7f8c",
+            "enable_dns_hostnames": true,
+            "enable_dns_support": true,
+            "enable_network_address_usage_metrics": false,
+            "filter": null,
+            "id": "vpc-0b60a109be6d2fdd4",
+            "instance_tenancy": "default",
+            "ipv6_association_id": "",
+            "ipv6_cidr_block": "",
+            "main_route_table_id": "rtb-0deed6544da180b6e",
+            "owner_id": "888577025156",
+            "state": null,
+            "tags": {},
+            "timeouts": null
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_db_instance",
+      "name": "postgres",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 2,
+          "attributes": {
+            "address": "quiz-arena-db.c4tgessoku2a.us-east-1.rds.amazonaws.com",
+            "allocated_storage": 20,
+            "allow_major_version_upgrade": null,
+            "apply_immediately": false,
+            "arn": "arn:aws:rds:us-east-1:888577025156:db:quiz-arena-db",
+            "auto_minor_version_upgrade": true,
+            "availability_zone": "us-east-1a",
+            "backup_retention_period": 0,
+            "backup_target": "region",
+            "backup_window": "05:26-05:56",
+            "blue_green_update": [],
+            "ca_cert_identifier": "rds-ca-rsa2048-g1",
+            "character_set_name": "",
+            "copy_tags_to_snapshot": false,
+            "custom_iam_instance_profile": "",
+            "customer_owned_ip_enabled": false,
+            "database_insights_mode": "standard",
+            "db_name": "quizdb",
+            "db_subnet_group_name": "default",
+            "dedicated_log_volume": false,
+            "delete_automated_backups": true,
+            "deletion_protection": false,
+            "domain": "",
+            "domain_auth_secret_arn": "",
+            "domain_dns_ips": null,
+            "domain_fqdn": "",
+            "domain_iam_role_name": "",
+            "domain_ou": "",
+            "enabled_cloudwatch_logs_exports": null,
+            "endpoint": "quiz-arena-db.c4tgessoku2a.us-east-1.rds.amazonaws.com:5432",
+            "engine": "postgres",
+            "engine_lifecycle_support": "open-source-rds-extended-support",
+            "engine_version": "16.4",
+            "engine_version_actual": "16.4",
+            "final_snapshot_identifier": null,
+            "hosted_zone_id": "Z2R2ITUGPM61AM",
+            "iam_database_authentication_enabled": false,
+            "id": "db-KQU5MCSX5DITSGF3IJ7BPTVNUI",
+            "identifier": "quiz-arena-db",
+            "identifier_prefix": "",
+            "instance_class": "db.t3.micro",
+            "iops": 0,
+            "kms_key_id": "",
+            "latest_restorable_time": "",
+            "license_model": "postgresql-license",
+            "listener_endpoint": [],
+            "maintenance_window": "mon:04:27-mon:04:57",
+            "manage_master_user_password": null,
+            "master_user_secret": [],
+            "master_user_secret_kms_key_id": null,
+            "max_allocated_storage": 0,
+            "monitoring_interval": 0,
+            "monitoring_role_arn": "",
+            "multi_az": false,
+            "nchar_character_set_name": "",
+            "network_type": "IPV4",
+            "option_group_name": "default:postgres-16",
+            "parameter_group_name": "default.postgres16",
+            "password": "QuizArena2026!",
+            "password_wo": null,
+            "password_wo_version": null,
+            "performance_insights_enabled": false,
+            "performance_insights_kms_key_id": "",
+            "performance_insights_retention_period": 0,
+            "port": 5432,
+            "publicly_accessible": false,
+            "replica_mode": "",
+            "replicas": [],
+            "replicate_source_db": "",
+            "resource_id": "db-KQU5MCSX5DITSGF3IJ7BPTVNUI",
+            "restore_to_point_in_time": [],
+            "s3_import": [],
+            "skip_final_snapshot": true,
+            "snapshot_identifier": null,
+            "status": "available",
+            "storage_encrypted": false,
+            "storage_throughput": 0,
+            "storage_type": "gp2",
+            "tags": {
+              "Name": "quiz-arena-db"
+            },
+            "tags_all": {
+              "Name": "quiz-arena-db"
+            },
+            "timeouts": null,
+            "timezone": "",
+            "upgrade_storage_config": null,
+            "username": "quizuser",
+            "vpc_security_group_ids": [
+              "sg-0fe5bebaef1d2f901"
+            ]
+          },
+          "sensitive_attributes": [
+            [
+              {
+                "type": "get_attr",
+                "value": "password"
+              }
+            ],
+            [
+              {
+                "type": "get_attr",
+                "value": "password_wo"
+              }
+            ]
+          ],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjozMDAwMDAwMDAwMDAwLCJkZWxldGUiOjM2MDAwMDAwMDAwMDAsInVwZGF0ZSI6NDgwMDAwMDAwMDAwMH0sInNjaGVtYV92ZXJzaW9uIjoiMiJ9",
+          "dependencies": [
+            "aws_security_group.ec2_sg",
+            "aws_security_group.rds_sg",
+            "data.aws_vpc.default"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_eip",
+      "name": "app_eip",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "address": null,
+            "allocation_id": "eipalloc-08831e6eabcf09976",
+            "arn": "arn:aws:ec2:us-east-1:888577025156:elastic-ip/eipalloc-08831e6eabcf09976",
+            "associate_with_private_ip": null,
+            "association_id": "eipassoc-01f04baac4461ae83",
+            "carrier_ip": "",
+            "customer_owned_ip": "",
+            "customer_owned_ipv4_pool": "",
+            "domain": "vpc",
+            "id": "eipalloc-08831e6eabcf09976",
+            "instance": "i-0e894f7b595c6c6a0",
+            "ipam_pool_id": null,
+            "network_border_group": "us-east-1",
+            "network_interface": "eni-0f8806c50a7163955",
+            "private_dns": "ip-172-31-62-234.ec2.internal",
+            "private_ip": "172.31.62.234",
+            "ptr_record": "",
+            "public_dns": "ec2-52-86-98-150.compute-1.amazonaws.com",
+            "public_ip": "52.86.98.150",
+            "public_ipv4_pool": "amazon",
+            "tags": {
+              "Name": "quiz-arena-app-eip"
+            },
+            "tags_all": {
+              "Name": "quiz-arena-app-eip"
+            },
+            "timeouts": null,
+            "vpc": true
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiZGVsZXRlIjoxODAwMDAwMDAwMDAsInJlYWQiOjkwMDAwMDAwMDAwMCwidXBkYXRlIjozMDAwMDAwMDAwMDB9fQ==",
+          "dependencies": [
+            "aws_db_instance.postgres",
+            "aws_elasticache_cluster.redis",
+            "aws_elasticache_subnet_group.redis_subnet",
+            "aws_iam_instance_profile.ec2_profile",
+            "aws_iam_role.ec2_role",
+            "aws_iam_role.lambda_role",
+            "aws_instance.app_server",
+            "aws_lambda_function.quiz_questions",
+            "aws_lambda_function_url.quiz_questions_url",
+            "aws_network_interface.app_eni",
+            "aws_network_interface.worker_eni",
+            "aws_security_group.ec2_sg",
+            "aws_security_group.rds_sg",
+            "aws_security_group.redis_sg",
+            "data.archive_file.lambda_zip",
+            "data.aws_subnets.default",
+            "data.aws_vpc.default"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_eip",
+      "name": "worker_eip",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "address": null,
+            "allocation_id": "eipalloc-05cc0f245df653ed0",
+            "arn": "arn:aws:ec2:us-east-1:888577025156:elastic-ip/eipalloc-05cc0f245df653ed0",
+            "associate_with_private_ip": null,
+            "association_id": "eipassoc-011fd22edc35fbb95",
+            "carrier_ip": "",
+            "customer_owned_ip": "",
+            "customer_owned_ipv4_pool": "",
+            "domain": "vpc",
+            "id": "eipalloc-05cc0f245df653ed0",
+            "instance": "i-0289beeee22690a4a",
+            "ipam_pool_id": null,
+            "network_border_group": "us-east-1",
+            "network_interface": "eni-0abf6d711cf777af0",
+            "private_dns": "ip-172-31-68-67.ec2.internal",
+            "private_ip": "172.31.68.67",
+            "ptr_record": "",
+            "public_dns": "ec2-100-49-119-89.compute-1.amazonaws.com",
+            "public_ip": "100.49.119.89",
+            "public_ipv4_pool": "amazon",
+            "tags": {
+              "Name": "quiz-arena-worker-eip"
+            },
+            "tags_all": {
+              "Name": "quiz-arena-worker-eip"
+            },
+            "timeouts": null,
+            "vpc": true
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiZGVsZXRlIjoxODAwMDAwMDAwMDAsInJlYWQiOjkwMDAwMDAwMDAwMCwidXBkYXRlIjozMDAwMDAwMDAwMDB9fQ==",
+          "dependencies": [
+            "aws_db_instance.postgres",
+            "aws_elasticache_cluster.redis",
+            "aws_elasticache_subnet_group.redis_subnet",
+            "aws_iam_instance_profile.ec2_profile",
+            "aws_iam_role.ec2_role",
+            "aws_iam_role.lambda_role",
+            "aws_instance.worker_server",
+            "aws_lambda_function.quiz_questions",
+            "aws_lambda_function_url.quiz_questions_url",
+            "aws_network_interface.app_eni",
+            "aws_network_interface.worker_eni",
+            "aws_security_group.ec2_sg",
+            "aws_security_group.rds_sg",
+            "aws_security_group.redis_sg",
+            "data.archive_file.lambda_zip",
+            "data.aws_subnets.default",
+            "data.aws_vpc.default"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_elasticache_cluster",
+      "name": "redis",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "apply_immediately": null,
+            "arn": "arn:aws:elasticache:us-east-1:888577025156:cluster:quiz-arena-redis",
+            "auto_minor_version_upgrade": "true",
+            "availability_zone": "us-east-1e",
+            "az_mode": "single-az",
+            "cache_nodes": [
+              {
+                "address": "quiz-arena-redis.ez9wgr.0001.use1.cache.amazonaws.com",
+                "availability_zone": "us-east-1e",
+                "id": "0001",
+                "outpost_arn": "",
+                "port": 6379
+              }
+            ],
+            "cluster_address": null,
+            "cluster_id": "quiz-arena-redis",
+            "configuration_endpoint": null,
+            "engine": "redis",
+            "engine_version": "7.1",
+            "engine_version_actual": "7.1.0",
+            "final_snapshot_identifier": null,
+            "id": "quiz-arena-redis",
+            "ip_discovery": "ipv4",
+            "log_delivery_configuration": [],
+            "maintenance_window": "thu:09:00-thu:10:00",
+            "network_type": "ipv4",
+            "node_type": "cache.t3.micro",
+            "notification_topic_arn": null,
+            "num_cache_nodes": 1,
+            "outpost_mode": null,
+            "parameter_group_name": "default.redis7",
+            "port": 6379,
+            "preferred_availability_zones": null,
+            "preferred_outpost_arn": "",
+            "replication_group_id": "",
+            "security_group_ids": [
+              "sg-03ef216b91f232d48"
+            ],
+            "snapshot_arns": null,
+            "snapshot_name": null,
+            "snapshot_retention_limit": 0,
+            "snapshot_window": "04:00-05:00",
+            "subnet_group_name": "quiz-arena-redis-subnet",
+            "tags": {
+              "Name": "quiz-arena-redis"
+            },
+            "tags_all": {
+              "Name": "quiz-arena-redis"
+            },
+            "timeouts": null,
+            "transit_encryption_enabled": false
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjoyNDAwMDAwMDAwMDAwLCJkZWxldGUiOjI0MDAwMDAwMDAwMDAsInVwZGF0ZSI6NDgwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "aws_elasticache_subnet_group.redis_subnet",
+            "aws_security_group.ec2_sg",
+            "aws_security_group.redis_sg",
+            "data.aws_subnets.default",
+            "data.aws_vpc.default"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_elasticache_subnet_group",
+      "name": "redis_subnet",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "arn": "arn:aws:elasticache:us-east-1:888577025156:subnetgroup:quiz-arena-redis-subnet",
+            "description": "Managed by Terraform",
+            "id": "quiz-arena-redis-subnet",
+            "name": "quiz-arena-redis-subnet",
+            "subnet_ids": [
+              "subnet-0146576f793f9b6a3",
+              "subnet-076213a4a3814fc83",
+              "subnet-096ca0a47cb2b2f83",
+              "subnet-0b975deaf2349495f",
+              "subnet-0bdafa2771e4c920d",
+              "subnet-0fca693cc4a240381"
+            ],
+            "tags": null,
+            "tags_all": {},
+            "vpc_id": "vpc-0b60a109be6d2fdd4"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "data.aws_subnets.default",
+            "data.aws_vpc.default"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_iam_instance_profile",
+      "name": "ec2_profile",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "arn": "arn:aws:iam::888577025156:instance-profile/quiz-arena-ec2-profile",
+            "create_date": "2026-04-14T12:32:56Z",
+            "id": "quiz-arena-ec2-profile",
+            "name": "quiz-arena-ec2-profile",
+            "name_prefix": "",
+            "path": "/",
+            "role": "quiz-arena-ec2-role",
+            "tags": null,
+            "tags_all": {},
+            "unique_id": "AIPA45Y2RMSCNAYF2QSAV"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_iam_role.ec2_role"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_iam_role",
+      "name": "ec2_role",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "arn": "arn:aws:iam::888577025156:role/quiz-arena-ec2-role",
+            "assume_role_policy": "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"}}],\"Version\":\"2012-10-17\"}",
+            "create_date": "2026-04-14T12:32:56Z",
+            "description": "",
+            "force_detach_policies": false,
+            "id": "quiz-arena-ec2-role",
+            "inline_policy": [],
+            "managed_policy_arns": [],
+            "max_session_duration": 3600,
+            "name": "quiz-arena-ec2-role",
+            "name_prefix": "",
+            "path": "/",
+            "permissions_boundary": "",
+            "tags": null,
+            "tags_all": {},
+            "unique_id": "AROA45Y2RMSCFRWXNF5LJ"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA=="
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_iam_role",
+      "name": "lambda_role",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "arn": "arn:aws:iam::888577025156:role/quiz-arena-lambda-role",
+            "assume_role_policy": "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"}}],\"Version\":\"2012-10-17\"}",
+            "create_date": "2026-04-14T12:32:56Z",
+            "description": "",
+            "force_detach_policies": false,
+            "id": "quiz-arena-lambda-role",
+            "inline_policy": [],
+            "managed_policy_arns": [],
+            "max_session_duration": 3600,
+            "name": "quiz-arena-lambda-role",
+            "name_prefix": "",
+            "path": "/",
+            "permissions_boundary": "",
+            "tags": null,
+            "tags_all": {},
+            "unique_id": "AROA45Y2RMSCLJUNMTZCE"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA=="
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_iam_role_policy",
+      "name": "ec2_lambda_invoke",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "id": "quiz-arena-ec2-role:lambda-invoke",
+            "name": "lambda-invoke",
+            "name_prefix": "",
+            "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Action\":[\"lambda:InvokeFunction\",\"lambda:InvokeFunctionUrl\"],\"Effect\":\"Allow\",\"Resource\":\"arn:aws:lambda:us-east-1:888577025156:function:quiz-arena-questions\"}]}",
+            "role": "quiz-arena-ec2-role"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_iam_role.ec2_role",
+            "aws_iam_role.lambda_role",
+            "aws_lambda_function.quiz_questions",
+            "data.archive_file.lambda_zip"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_iam_role_policy_attachment",
+      "name": "lambda_basic",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "id": "quiz-arena-lambda-role-20260414123257155200000001",
+            "policy_arn": "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+            "role": "quiz-arena-lambda-role"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_iam_role.lambda_role"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_instance",
+      "name": "app_server",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 1,
+          "attributes": {
+            "ami": "ami-0f3caa1cf4417e51b",
+            "arn": "arn:aws:ec2:us-east-1:888577025156:instance/i-0e894f7b595c6c6a0",
+            "associate_public_ip_address": true,
+            "availability_zone": "us-east-1e",
+            "capacity_reservation_specification": [
+              {
+                "capacity_reservation_preference": "open",
+                "capacity_reservation_target": []
+              }
+            ],
+            "cpu_core_count": 1,
+            "cpu_options": [
+              {
+                "amd_sev_snp": "",
+                "core_count": 1,
+                "threads_per_core": 1
+              }
+            ],
+            "cpu_threads_per_core": 1,
+            "credit_specification": [
+              {
+                "cpu_credits": "standard"
+              }
+            ],
+            "disable_api_stop": false,
+            "disable_api_termination": false,
+            "ebs_block_device": [],
+            "ebs_optimized": false,
+            "enable_primary_ipv6": null,
+            "enclave_options": [
+              {
+                "enabled": false
+              }
+            ],
+            "ephemeral_block_device": [],
+            "get_password_data": false,
+            "hibernation": false,
+            "host_id": "",
+            "host_resource_group_arn": null,
+            "iam_instance_profile": "quiz-arena-ec2-profile",
+            "id": "i-0e894f7b595c6c6a0",
+            "instance_initiated_shutdown_behavior": "stop",
+            "instance_lifecycle": "",
+            "instance_market_options": [],
+            "instance_state": "running",
+            "instance_type": "t2.micro",
+            "ipv6_address_count": 0,
+            "ipv6_addresses": [],
+            "key_name": "quiz-arena-key",
+            "launch_template": [],
+            "maintenance_options": [
+              {
+                "auto_recovery": "default"
+              }
+            ],
+            "metadata_options": [
+              {
+                "http_endpoint": "enabled",
+                "http_protocol_ipv6": "disabled",
+                "http_put_response_hop_limit": 2,
+                "http_tokens": "required",
+                "instance_metadata_tags": "disabled"
+              }
+            ],
+            "monitoring": false,
+            "network_interface": [
+              {
+                "delete_on_termination": false,
+                "device_index": 0,
+                "network_card_index": 0,
+                "network_interface_id": "eni-0f8806c50a7163955"
+              }
+            ],
+            "outpost_arn": "",
+            "password_data": "",
+            "placement_group": "",
+            "placement_partition_number": 0,
+            "primary_network_interface_id": "eni-0f8806c50a7163955",
+            "private_dns": "ip-172-31-62-234.ec2.internal",
+            "private_dns_name_options": [
+              {
+                "enable_resource_name_dns_a_record": false,
+                "enable_resource_name_dns_aaaa_record": false,
+                "hostname_type": "ip-name"
+              }
+            ],
+            "private_ip": "172.31.62.234",
+            "public_dns": "ec2-18-214-89-167.compute-1.amazonaws.com",
+            "public_ip": "18.214.89.167",
+            "root_block_device": [
+              {
+                "delete_on_termination": true,
+                "device_name": "/dev/xvda",
+                "encrypted": false,
+                "iops": 100,
+                "kms_key_id": "",
+                "tags": null,
+                "tags_all": {},
+                "throughput": 0,
+                "volume_id": "vol-08952ecae61563c04",
+                "volume_size": 30,
+                "volume_type": "gp2"
+              }
+            ],
+            "secondary_private_ips": [],
+            "security_groups": [
+              "quiz-arena-ec2-sg"
+            ],
+            "source_dest_check": true,
+            "spot_instance_request_id": "",
+            "subnet_id": "subnet-0b975deaf2349495f",
+            "tags": {
+              "Name": "quiz-arena-app-server"
+            },
+            "tags_all": {
+              "Name": "quiz-arena-app-server"
+            },
+            "tenancy": "default",
+            "timeouts": null,
+            "user_data": "1516c71ec69f3d492a50a40c750bf34a85fb21c4",
+            "user_data_base64": null,
+            "user_data_replace_on_change": false,
+            "volume_tags": null,
+            "vpc_security_group_ids": [
+              "sg-07fffd2f29c747de7"
+            ]
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjo2MDAwMDAwMDAwMDAsImRlbGV0ZSI6MTIwMDAwMDAwMDAwMCwicmVhZCI6OTAwMDAwMDAwMDAwLCJ1cGRhdGUiOjYwMDAwMDAwMDAwMH0sInNjaGVtYV92ZXJzaW9uIjoiMSJ9",
+          "dependencies": [
+            "aws_db_instance.postgres",
+            "aws_elasticache_cluster.redis",
+            "aws_elasticache_subnet_group.redis_subnet",
+            "aws_iam_instance_profile.ec2_profile",
+            "aws_iam_role.ec2_role",
+            "aws_iam_role.lambda_role",
+            "aws_lambda_function.quiz_questions",
+            "aws_lambda_function_url.quiz_questions_url",
+            "aws_network_interface.app_eni",
+            "aws_network_interface.worker_eni",
+            "aws_security_group.ec2_sg",
+            "aws_security_group.rds_sg",
+            "aws_security_group.redis_sg",
+            "data.archive_file.lambda_zip",
+            "data.aws_subnets.default",
+            "data.aws_vpc.default"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_instance",
+      "name": "worker_server",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 1,
+          "attributes": {
+            "ami": "ami-0f3caa1cf4417e51b",
+            "arn": "arn:aws:ec2:us-east-1:888577025156:instance/i-0289beeee22690a4a",
+            "associate_public_ip_address": true,
+            "availability_zone": "us-east-1f",
+            "capacity_reservation_specification": [
+              {
+                "capacity_reservation_preference": "open",
+                "capacity_reservation_target": []
+              }
+            ],
+            "cpu_core_count": 1,
+            "cpu_options": [
+              {
+                "amd_sev_snp": "",
+                "core_count": 1,
+                "threads_per_core": 1
+              }
+            ],
+            "cpu_threads_per_core": 1,
+            "credit_specification": [
+              {
+                "cpu_credits": "standard"
+              }
+            ],
+            "disable_api_stop": false,
+            "disable_api_termination": false,
+            "ebs_block_device": [],
+            "ebs_optimized": false,
+            "enable_primary_ipv6": null,
+            "enclave_options": [
+              {
+                "enabled": false
+              }
+            ],
+            "ephemeral_block_device": [],
+            "get_password_data": false,
+            "hibernation": false,
+            "host_id": "",
+            "host_resource_group_arn": null,
+            "iam_instance_profile": "quiz-arena-ec2-profile",
+            "id": "i-0289beeee22690a4a",
+            "instance_initiated_shutdown_behavior": "stop",
+            "instance_lifecycle": "",
+            "instance_market_options": [],
+            "instance_state": "running",
+            "instance_type": "t2.micro",
+            "ipv6_address_count": 0,
+            "ipv6_addresses": [],
+            "key_name": "quiz-arena-key",
+            "launch_template": [],
+            "maintenance_options": [
+              {
+                "auto_recovery": "default"
+              }
+            ],
+            "metadata_options": [
+              {
+                "http_endpoint": "enabled",
+                "http_protocol_ipv6": "disabled",
+                "http_put_response_hop_limit": 2,
+                "http_tokens": "required",
+                "instance_metadata_tags": "disabled"
+              }
+            ],
+            "monitoring": false,
+            "network_interface": [
+              {
+                "delete_on_termination": false,
+                "device_index": 0,
+                "network_card_index": 0,
+                "network_interface_id": "eni-0abf6d711cf777af0"
+              }
+            ],
+            "outpost_arn": "",
+            "password_data": "",
+            "placement_group": "",
+            "placement_partition_number": 0,
+            "primary_network_interface_id": "eni-0abf6d711cf777af0",
+            "private_dns": "ip-172-31-68-67.ec2.internal",
+            "private_dns_name_options": [
+              {
+                "enable_resource_name_dns_a_record": false,
+                "enable_resource_name_dns_aaaa_record": false,
+                "hostname_type": "ip-name"
+              }
+            ],
+            "private_ip": "172.31.68.67",
+            "public_dns": "ec2-44-192-78-48.compute-1.amazonaws.com",
+            "public_ip": "44.192.78.48",
+            "root_block_device": [
+              {
+                "delete_on_termination": true,
+                "device_name": "/dev/xvda",
+                "encrypted": false,
+                "iops": 100,
+                "kms_key_id": "",
+                "tags": null,
+                "tags_all": {},
+                "throughput": 0,
+                "volume_id": "vol-0941db27e48eb1527",
+                "volume_size": 30,
+                "volume_type": "gp2"
+              }
+            ],
+            "secondary_private_ips": [],
+            "security_groups": [
+              "quiz-arena-ec2-sg"
+            ],
+            "source_dest_check": true,
+            "spot_instance_request_id": "",
+            "subnet_id": "subnet-0fca693cc4a240381",
+            "tags": {
+              "Name": "quiz-arena-worker-server"
+            },
+            "tags_all": {
+              "Name": "quiz-arena-worker-server"
+            },
+            "tenancy": "default",
+            "timeouts": null,
+            "user_data": "22399572cfbf5de7d13de86a688eb2e7914cadf8",
+            "user_data_base64": null,
+            "user_data_replace_on_change": false,
+            "volume_tags": null,
+            "vpc_security_group_ids": [
+              "sg-07fffd2f29c747de7"
+            ]
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjo2MDAwMDAwMDAwMDAsImRlbGV0ZSI6MTIwMDAwMDAwMDAwMCwicmVhZCI6OTAwMDAwMDAwMDAwLCJ1cGRhdGUiOjYwMDAwMDAwMDAwMH0sInNjaGVtYV92ZXJzaW9uIjoiMSJ9",
+          "dependencies": [
+            "aws_db_instance.postgres",
+            "aws_elasticache_cluster.redis",
+            "aws_elasticache_subnet_group.redis_subnet",
+            "aws_iam_instance_profile.ec2_profile",
+            "aws_iam_role.ec2_role",
+            "aws_iam_role.lambda_role",
+            "aws_lambda_function.quiz_questions",
+            "aws_lambda_function_url.quiz_questions_url",
+            "aws_network_interface.app_eni",
+            "aws_network_interface.worker_eni",
+            "aws_security_group.ec2_sg",
+            "aws_security_group.rds_sg",
+            "aws_security_group.redis_sg",
+            "data.archive_file.lambda_zip",
+            "data.aws_subnets.default",
+            "data.aws_vpc.default"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_lambda_function",
+      "name": "quiz_questions",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "architectures": [
+              "x86_64"
+            ],
+            "arn": "arn:aws:lambda:us-east-1:888577025156:function:quiz-arena-questions",
+            "code_sha256": "oM7+HHHsqWZRfAR0oryH9MjLPE1+m3kf0q10Vq9jZ80=",
+            "code_signing_config_arn": "",
+            "dead_letter_config": [],
+            "description": "",
+            "environment": [],
+            "ephemeral_storage": [
+              {
+                "size": 512
+              }
+            ],
+            "file_system_config": [],
+            "filename": "./lambda.zip",
+            "function_name": "quiz-arena-questions",
+            "handler": "handler.lambda_handler",
+            "id": "quiz-arena-questions",
+            "image_config": [],
+            "image_uri": "",
+            "invoke_arn": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:888577025156:function:quiz-arena-questions/invocations",
+            "kms_key_arn": "",
+            "last_modified": "2026-04-14T12:33:07.262+0000",
+            "layers": null,
+            "logging_config": [
+              {
+                "application_log_level": "",
+                "log_format": "Text",
+                "log_group": "/aws/lambda/quiz-arena-questions",
+                "system_log_level": ""
+              }
+            ],
+            "memory_size": 128,
+            "package_type": "Zip",
+            "publish": false,
+            "qualified_arn": "arn:aws:lambda:us-east-1:888577025156:function:quiz-arena-questions:$LATEST",
+            "qualified_invoke_arn": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:888577025156:function:quiz-arena-questions:$LATEST/invocations",
+            "replace_security_groups_on_destroy": null,
+            "replacement_security_group_ids": null,
+            "reserved_concurrent_executions": -1,
+            "role": "arn:aws:iam::888577025156:role/quiz-arena-lambda-role",
+            "runtime": "python3.12",
+            "s3_bucket": null,
+            "s3_key": null,
+            "s3_object_version": null,
+            "signing_job_arn": "",
+            "signing_profile_version_arn": "",
+            "skip_destroy": false,
+            "snap_start": [],
+            "source_code_hash": "oM7+HHHsqWZRfAR0oryH9MjLPE1+m3kf0q10Vq9jZ80=",
+            "source_code_size": 12140,
+            "tags": {
+              "Name": "quiz-arena-lambda"
+            },
+            "tags_all": {
+              "Name": "quiz-arena-lambda"
+            },
+            "timeout": 10,
+            "timeouts": null,
+            "tracing_config": [
+              {
+                "mode": "PassThrough"
+              }
+            ],
+            "version": "$LATEST",
+            "vpc_config": []
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjo2MDAwMDAwMDAwMDAsImRlbGV0ZSI6NjAwMDAwMDAwMDAwLCJ1cGRhdGUiOjYwMDAwMDAwMDAwMH19",
+          "dependencies": [
+            "aws_iam_role.lambda_role",
+            "data.archive_file.lambda_zip"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_lambda_function_url",
+      "name": "quiz_questions_url",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "authorization_type": "NONE",
+            "cors": [],
+            "function_arn": "arn:aws:lambda:us-east-1:888577025156:function:quiz-arena-questions",
+            "function_name": "quiz-arena-questions",
+            "function_url": "https://rivsjmc4lkgu57uuselzraosiq0rujbp.lambda-url.us-east-1.on.aws/",
+            "id": "quiz-arena-questions",
+            "invoke_mode": "BUFFERED",
+            "qualifier": "",
+            "timeouts": null,
+            "url_id": "rivsjmc4lkgu57uuselzraosiq0rujbp"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjo2MDAwMDAwMDAwMDB9fQ==",
+          "dependencies": [
+            "aws_iam_role.lambda_role",
+            "aws_lambda_function.quiz_questions",
+            "data.archive_file.lambda_zip"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_lambda_permission",
+      "name": "function_invoke_public",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "action": "lambda:InvokeFunction",
+            "event_source_token": null,
+            "function_name": "quiz-arena-questions",
+            "function_url_auth_type": null,
+            "id": "FunctionInvokeAllowPublicAccess",
+            "principal": "*",
+            "principal_org_id": null,
+            "qualifier": "",
+            "source_account": null,
+            "source_arn": null,
+            "statement_id": "FunctionInvokeAllowPublicAccess",
+            "statement_id_prefix": ""
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_iam_role.lambda_role",
+            "aws_lambda_function.quiz_questions",
+            "data.archive_file.lambda_zip"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_network_interface",
+      "name": "app_eni",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "arn": "arn:aws:ec2:us-east-1:888577025156:network-interface/eni-0f8806c50a7163955",
+            "attachment": [],
+            "description": "",
+            "enable_primary_ipv6": null,
+            "id": "eni-0f8806c50a7163955",
+            "interface_type": "interface",
+            "ipv4_prefix_count": 0,
+            "ipv4_prefixes": [],
+            "ipv6_address_count": 0,
+            "ipv6_address_list": [],
+            "ipv6_address_list_enabled": false,
+            "ipv6_addresses": [],
+            "ipv6_prefix_count": 0,
+            "ipv6_prefixes": [],
+            "mac_address": "06:e6:2e:c8:25:29",
+            "outpost_arn": "",
+            "owner_id": "888577025156",
+            "private_dns_name": "ip-172-31-62-234.ec2.internal",
+            "private_ip": "172.31.62.234",
+            "private_ip_list": [
+              "172.31.62.234"
+            ],
+            "private_ip_list_enabled": false,
+            "private_ips": [
+              "172.31.62.234"
+            ],
+            "private_ips_count": 0,
+            "security_groups": [
+              "sg-07fffd2f29c747de7"
+            ],
+            "source_dest_check": true,
+            "subnet_id": "subnet-0b975deaf2349495f",
+            "tags": {
+              "Name": "quiz-arena-app-eni"
+            },
+            "tags_all": {
+              "Name": "quiz-arena-app-eni"
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_security_group.ec2_sg",
+            "data.aws_subnets.default",
+            "data.aws_vpc.default"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_network_interface",
+      "name": "worker_eni",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 0,
+          "attributes": {
+            "arn": "arn:aws:ec2:us-east-1:888577025156:network-interface/eni-0abf6d711cf777af0",
+            "attachment": [],
+            "description": "",
+            "enable_primary_ipv6": null,
+            "id": "eni-0abf6d711cf777af0",
+            "interface_type": "interface",
+            "ipv4_prefix_count": 0,
+            "ipv4_prefixes": [],
+            "ipv6_address_count": 0,
+            "ipv6_address_list": [],
+            "ipv6_address_list_enabled": false,
+            "ipv6_addresses": [],
+            "ipv6_prefix_count": 0,
+            "ipv6_prefixes": [],
+            "mac_address": "16:ff:e9:de:af:21",
+            "outpost_arn": "",
+            "owner_id": "888577025156",
+            "private_dns_name": "ip-172-31-68-67.ec2.internal",
+            "private_ip": "172.31.68.67",
+            "private_ip_list": [
+              "172.31.68.67"
+            ],
+            "private_ip_list_enabled": false,
+            "private_ips": [
+              "172.31.68.67"
+            ],
+            "private_ips_count": 0,
+            "security_groups": [
+              "sg-07fffd2f29c747de7"
+            ],
+            "source_dest_check": true,
+            "subnet_id": "subnet-0fca693cc4a240381",
+            "tags": {
+              "Name": "quiz-arena-worker-eni"
+            },
+            "tags_all": {
+              "Name": "quiz-arena-worker-eni"
+            }
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "bnVsbA==",
+          "dependencies": [
+            "aws_security_group.ec2_sg",
+            "data.aws_subnets.default",
+            "data.aws_vpc.default"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_security_group",
+      "name": "ec2_sg",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 1,
+          "attributes": {
+            "arn": "arn:aws:ec2:us-east-1:888577025156:security-group/sg-07fffd2f29c747de7",
+            "description": "EC2 ports for Quiz Arena",
+            "egress": [
+              {
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "description": "",
+                "from_port": 0,
+                "ipv6_cidr_blocks": [],
+                "prefix_list_ids": [],
+                "protocol": "-1",
+                "security_groups": [],
+                "self": false,
+                "to_port": 0
+              }
+            ],
+            "id": "sg-07fffd2f29c747de7",
+            "ingress": [
+              {
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "description": "Frontend",
+                "from_port": 3000,
+                "ipv6_cidr_blocks": [],
+                "prefix_list_ids": [],
+                "protocol": "tcp",
+                "security_groups": [],
+                "self": false,
+                "to_port": 3000
+              },
+              {
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "description": "Grafana",
+                "from_port": 3001,
+                "ipv6_cidr_blocks": [],
+                "prefix_list_ids": [],
+                "protocol": "tcp",
+                "security_groups": [],
+                "self": false,
+                "to_port": 3001
+              },
+              {
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "description": "HTTP",
+                "from_port": 80,
+                "ipv6_cidr_blocks": [],
+                "prefix_list_ids": [],
+                "protocol": "tcp",
+                "security_groups": [],
+                "self": false,
+                "to_port": 80
+              },
+              {
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "description": "HTTPS",
+                "from_port": 443,
+                "ipv6_cidr_blocks": [],
+                "prefix_list_ids": [],
+                "protocol": "tcp",
+                "security_groups": [],
+                "self": false,
+                "to_port": 443
+              },
+              {
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "description": "Prometheus",
+                "from_port": 9090,
+                "ipv6_cidr_blocks": [],
+                "prefix_list_ids": [],
+                "protocol": "tcp",
+                "security_groups": [],
+                "self": false,
+                "to_port": 9090
+              },
+              {
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "description": "SSH",
+                "from_port": 22,
+                "ipv6_cidr_blocks": [],
+                "prefix_list_ids": [],
+                "protocol": "tcp",
+                "security_groups": [],
+                "self": false,
+                "to_port": 22
+              },
+              {
+                "cidr_blocks": [],
+                "description": "Backend cross-server",
+                "from_port": 8000,
+                "ipv6_cidr_blocks": [],
+                "prefix_list_ids": [],
+                "protocol": "tcp",
+                "security_groups": [],
+                "self": true,
+                "to_port": 8000
+              },
+              {
+                "cidr_blocks": [],
+                "description": "Node exporter metrics",
+                "from_port": 9100,
+                "ipv6_cidr_blocks": [],
+                "prefix_list_ids": [],
+                "protocol": "tcp",
+                "security_groups": [],
+                "self": true,
+                "to_port": 9100
+              }
+            ],
+            "name": "quiz-arena-ec2-sg",
+            "name_prefix": "",
+            "owner_id": "888577025156",
+            "revoke_rules_on_delete": false,
+            "tags": {
+              "Name": "quiz-arena-ec2-sg"
+            },
+            "tags_all": {
+              "Name": "quiz-arena-ec2-sg"
+            },
+            "timeouts": null,
+            "vpc_id": "vpc-0b60a109be6d2fdd4"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjo2MDAwMDAwMDAwMDAsImRlbGV0ZSI6OTAwMDAwMDAwMDAwfSwic2NoZW1hX3ZlcnNpb24iOiIxIn0=",
+          "dependencies": [
+            "data.aws_vpc.default"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_security_group",
+      "name": "rds_sg",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 1,
+          "attributes": {
+            "arn": "arn:aws:ec2:us-east-1:888577025156:security-group/sg-0fe5bebaef1d2f901",
+            "description": "RDS PostgreSQL",
+            "egress": [
+              {
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "description": "",
+                "from_port": 0,
+                "ipv6_cidr_blocks": [],
+                "prefix_list_ids": [],
+                "protocol": "-1",
+                "security_groups": [],
+                "self": false,
+                "to_port": 0
+              }
+            ],
+            "id": "sg-0fe5bebaef1d2f901",
+            "ingress": [
+              {
+                "cidr_blocks": [],
+                "description": "PostgreSQL from EC2",
+                "from_port": 5432,
+                "ipv6_cidr_blocks": [],
+                "prefix_list_ids": [],
+                "protocol": "tcp",
+                "security_groups": [
+                  "sg-07fffd2f29c747de7"
+                ],
+                "self": false,
+                "to_port": 5432
+              }
+            ],
+            "name": "quiz-arena-rds-sg",
+            "name_prefix": "",
+            "owner_id": "888577025156",
+            "revoke_rules_on_delete": false,
+            "tags": {
+              "Name": "quiz-arena-rds-sg"
+            },
+            "tags_all": {
+              "Name": "quiz-arena-rds-sg"
+            },
+            "timeouts": null,
+            "vpc_id": "vpc-0b60a109be6d2fdd4"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjo2MDAwMDAwMDAwMDAsImRlbGV0ZSI6OTAwMDAwMDAwMDAwfSwic2NoZW1hX3ZlcnNpb24iOiIxIn0=",
+          "dependencies": [
+            "aws_security_group.ec2_sg",
+            "data.aws_vpc.default"
+          ]
+        }
+      ]
+    },
+    {
+      "mode": "managed",
+      "type": "aws_security_group",
+      "name": "redis_sg",
+      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
+      "instances": [
+        {
+          "schema_version": 1,
+          "attributes": {
+            "arn": "arn:aws:ec2:us-east-1:888577025156:security-group/sg-03ef216b91f232d48",
+            "description": "ElastiCache Redis",
+            "egress": [
+              {
+                "cidr_blocks": [
+                  "0.0.0.0/0"
+                ],
+                "description": "",
+                "from_port": 0,
+                "ipv6_cidr_blocks": [],
+                "prefix_list_ids": [],
+                "protocol": "-1",
+                "security_groups": [],
+                "self": false,
+                "to_port": 0
+              }
+            ],
+            "id": "sg-03ef216b91f232d48",
+            "ingress": [
+              {
+                "cidr_blocks": [],
+                "description": "Redis from EC2",
+                "from_port": 6379,
+                "ipv6_cidr_blocks": [],
+                "prefix_list_ids": [],
+                "protocol": "tcp",
+                "security_groups": [
+                  "sg-07fffd2f29c747de7"
+                ],
+                "self": false,
+                "to_port": 6379
+              }
+            ],
+            "name": "quiz-arena-redis-sg",
+            "name_prefix": "",
+            "owner_id": "888577025156",
+            "revoke_rules_on_delete": false,
+            "tags": {
+              "Name": "quiz-arena-redis-sg"
+            },
+            "tags_all": {
+              "Name": "quiz-arena-redis-sg"
+            },
+            "timeouts": null,
+            "vpc_id": "vpc-0b60a109be6d2fdd4"
+          },
+          "sensitive_attributes": [],
+          "identity_schema_version": 0,
+          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiY3JlYXRlIjo2MDAwMDAwMDAwMDAsImRlbGV0ZSI6OTAwMDAwMDAwMDAwfSwic2NoZW1hX3ZlcnNpb24iOiIxIn0=",
+          "dependencies": [
+            "aws_security_group.ec2_sg",
+            "data.aws_vpc.default"
+          ]
+        }
+      ]
+    }
+  ],
+  "check_results": null
+}
