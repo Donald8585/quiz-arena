@@ -325,17 +325,9 @@ resource "aws_eip" "worker_eip" {
   depends_on        = [aws_instance.worker_server]
 }
 
-resource "aws_lambda_permission" "function_url_public" {
-  statement_id           = "FunctionURLAllowPublicAccess"
-  action                 = "lambda:InvokeFunctionUrl"
-  function_name          = aws_lambda_function.quiz_questions.function_name
-  principal              = "*"
-  function_url_auth_type = "NONE"
-}
-
-resource "aws_lambda_permission" "function_invoke_public" {
-  statement_id  = "FunctionInvokeAllowPublicAccess"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.quiz_questions.function_name
-  principal     = "*"
-}
+# ============================================================
+# NO aws_lambda_permission RESOURCES NEEDED!
+# aws_lambda_function_url with authorization_type = "NONE"
+# auto-creates both FunctionURLAllowPublicAccess and
+# FunctionInvokeAllowPublicAccess statements for you.
+# ============================================================
