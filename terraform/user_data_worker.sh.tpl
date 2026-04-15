@@ -2,6 +2,13 @@
 exec > /var/log/quiz-arena-deploy.log 2>&1
 set -ex
 
+# ── Add swap (critical for t2.micro with 1GB RAM) ──
+dd if=/dev/zero of=/swapfile bs=128M count=16
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
+
 dnf update -y
 dnf install -y docker git
 systemctl enable docker && systemctl start docker
@@ -52,7 +59,7 @@ services:
     mem_limit: 128m
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.4.2
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_SERVER_HTTP_PORT=3001
@@ -64,7 +71,7 @@ services:
     depends_on: [prometheus]
     networks: [quiznet]
     restart: unless-stopped
-    mem_limit: 128m
+    mem_limit: 384m
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -138,7 +145,7 @@ providers:
       foldersFromFilesStructure: false
 DBEOF
 
-# ── Pre-built Quiz Arena dashboard (CORRECT metric names) ──
+# ── Pre-built Quiz Arena dashboard ──
 cat > monitoring/dashboards/quiz-arena.json << 'JSONEOF'
 {
   "annotations": { "list": [] },
